@@ -56,12 +56,19 @@ def config_update_recursive(
                 option = default_option
 
             if option == 'add':
+<<<<<<< HEAD
                 if default_option is None:
                     print(f'Adding override key {key}')
                 base_config[key] = copy.deepcopy(override_config[key])
             elif option == 'ignore':
                 if default_option is None:
                     print(f'Ignoring override key {key}')
+=======
+                print(f'Adding override key {key}')
+                base_config[key] = copy.deepcopy(override_config[key])
+            elif option == 'ignore':
+                print(f'Ignoring override key {key}')
+>>>>>>> 26149c6 (Copy in config utilities to utils.config)
                 continue
             elif option == 'cancel':
                 print('Exiting')
@@ -75,16 +82,21 @@ def config_update_recursive(
                 base_config[key] = copy.deepcopy(value)
 
 
+<<<<<<< HEAD
 class ConfigNotFoundError(BaseException):
     pass
 
 
 def load_config(path, raise_exc=False) -> dict:
+=======
+def load_config(path) -> dict:
+>>>>>>> 26149c6 (Copy in config utilities to utils.config)
     """
     Load a config file into a dict.
 
     :param path: Path to config file. Must be either JSON or YAML file. File
         type will be inferred if no extension is present.
+<<<<<<< HEAD
     :param raise_exc: Whether to raise an exception if the requested file does
         not exist.
     :return: dict object containing configuration options from the file. Empty
@@ -122,6 +134,27 @@ def load_config(path, raise_exc=False) -> dict:
     else:
         if raise_exc:
             raise ConfigNotFoundError(f'Config {path} not found.')
+=======
+    :return: dict object containing configuration options from the file. Empty
+        dict if the file does not exist.
+    """
+    if os.path.splitext(path)[1] not in ('yaml', 'json'):
+        if os.path.exists(path + '.yaml'):
+            path = path + '.yaml'
+        elif os.path.exists(path + '.json'):
+            path = path + '.json'
+        else:
+            return {}
+
+    ext = os.path.splitext(path)[1]
+    if ext.lower() == '.yaml':
+        with open(path, 'r') as f:
+            return yaml.safe_load(f)
+    elif ext.lower() == '.json':
+        with open(path, 'r') as f:
+            return json.load(f)
+    else:
+>>>>>>> 26149c6 (Copy in config utilities to utils.config)
         return {}
 
 
