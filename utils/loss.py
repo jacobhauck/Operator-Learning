@@ -14,7 +14,7 @@ def create_loss(config: Mapping):
     """
     Create a loss function from its configuration.
 
-    :param config: Dictionary of model configuration options. Must contain a
+    :param config: Dictionary of loss configuration options. Must contain a
         'name' field to specify which function to load, which refers to the
         activation function's name within the torch.nn module, or else the name
         used as a key in the utils.loss.custom_losses dictionary of

@@ -14,8 +14,8 @@ def create_activation(config: Mapping):
     """
     Create an activation function from its configuration.
 
-    :param config: Dictionary of model configuration options. Must contain a
-        'name' field to specify which functions to load, which refers to the
+    :param config: Dictionary of function configuration options. Must contain a
+        'name' field to specify which function to load, which refers to the
         activation function's name within the torch.nn module, or else the name
         used as a key in the utils.activation.custom_activations dictionary of
         custom activation functions.
