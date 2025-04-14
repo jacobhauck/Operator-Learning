@@ -191,6 +191,25 @@ class GridInterpolator(Interpolator):
         _grid_interpolate(function, x, self.method, self.extend)
 
 
+class OracleInterpolator(Interpolator):
+    def __init__(self, oracle):
+        """
+        Interpolate a function by using a known oracle for it.
+        """
+        self.oracle = oracle
+
+    def interpolate(self, function: 'Function', x):
+        """
+        Compute the value of the function using the oracle.
+        :param function: The function; this argument is actually ignored,
+            and the stored oracle is used for interpolation; be careful not to
+            use this as an interpolator unless you are sure that the function
+            it is attached to is actually the same as the oracle!
+        :param x: The values at which to evaluate the function.
+        """
+        return self.oracle(x)
+
+
 class GridFunction(Function):
     def __init__(self, y, x=None, interpolator: Interpolator | None = None, xs=None, is_sorted=False):
         """
@@ -245,7 +264,8 @@ class GridFunction(Function):
         Constructs a GridFunction from an oracle
         :param f: The oracle, maps (..., d_in) to (..., d_out)
         :param x: (..., d_in), optional grid sampling points
-        :param interpolator: optional interpolator
+        :param interpolator: optional interpolator; if not given, an
+            OracleInterpolator is used with the given oracle
         :param xs: list of length d_in of sampling points in each direction. At
             least one of x or xs must be provided
         :param is_sorted: Whether the sampling points are given in sorted order
@@ -264,6 +284,9 @@ class GridFunction(Function):
             raise ValueError('Must provide one or both of x and xs')
 
         y = f(x)
+
+        if interpolator is None:
+            interpolator = OracleInterpolator(f)
 
         return GridFunction(y, x=x, interpolator=interpolator, xs=xs, is_sorted=True)
 
@@ -295,7 +318,7 @@ class GridFunction(Function):
         return xs
 
     @staticmethod
-    def uniform_from_oracle(f, min_point, max_point, num):
+    def uniform_from_oracle(f, min_point, max_point, num, interpolator=None):
         """
         Create a GridFunction on a uniform grid from an oracle.
         :param f: The oracle, maps (..., d_in) to (..., d_out)
@@ -303,9 +326,12 @@ class GridFunction(Function):
         :param max_point: (d_in) The maximum coordinate values
         :param num: (d_in) or int. The number of samples in each
             direction, optionally one number to be used for all directions
+        :param interpolator: optional interpolator; if not given, an
+            OracleInterpolator is used with the given oracle
         """
         return GridFunction.from_oracle(
             f,
             xs=GridFunction.uniform_xs(min_point, max_point, num),
-            is_sorted=True
+            is_sorted=True,
+            interpolator=interpolator
         )
