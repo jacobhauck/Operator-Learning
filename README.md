@@ -55,6 +55,10 @@ observations in a dataset. We take the following approach to handle this
 inconvenience: operator learning models should be implemented for a 
 _specific_ representation (without access to the underlying function)
 so that they can be applied without modification to batches of 
-same-representation functions. The choice of sampling representations
-(as opposed to, say, Fourier coefficients or something like that) enables
+same-representation functions. The choice of sampling-based representations
+(as opposed to, say, Fourier coefficients) enables
 this simple approach to allow for batch parallelization.
+
+In a similar way, datasets should keep track of which observations use
+the same discrete representation in a way that facilitates sampling
+batches with the same representation.
