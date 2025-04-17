@@ -188,7 +188,7 @@ class GridInterpolator(Interpolator):
         self.extend = extend
 
     def interpolate(self, function: 'GridFunction', x):
-        _grid_interpolate(function, x, self.method, self.extend)
+        return _grid_interpolate(function, x, self.method, self.extend)
 
 
 class OracleInterpolator(Interpolator):
