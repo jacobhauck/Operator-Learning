@@ -1,5 +1,5 @@
 import pytest
-import data.operatorlearning as ol_data
+import operatorlearning as ol
 import numpy as np
 import torch
 
@@ -12,7 +12,7 @@ def test(num_reps, size, batch_size, drop_last):
     representations = torch.from_numpy(
         np.random.choice(np.arange(num_reps, dtype=int), size=size, replace=True)
     )
-    batch_sampler = ol_data.SameRepresentationBatchSampler(
+    batch_sampler = ol.data.SameRepresentationBatchSampler(
         representations, batch_size=batch_size, drop_last=drop_last
     )
     seen = set()
