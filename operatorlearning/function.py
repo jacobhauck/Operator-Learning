@@ -58,6 +58,68 @@ class Function(torch.nn.Module):
 
         return self.interpolator.interpolate(self, x_query)
 
+    def quick_visualize(self, x_min=None, x_max=None):
+        import matplotlib.pyplot as plt
+        n_rows = max(1, int(self.d_out**.5 / 2))
+        n_cols = (self.d_out + n_rows - 1) // n_rows
+        fig, axes = plt.subplots(n_rows, n_cols)
+
+        if self.d_in == 1:
+            if x_min is None:
+                x_min = float(self.x.min())
+            if x_max is None:
+                x_max = float(self.x.max())
+            x_query = torch.linspace(x_min, x_max, 1000)
+            y_query = self(x_query)
+            if self.is_scalar:
+                y_query = y_query[..., None]
+
+            i = 0
+            if n_rows > 1 and n_cols > 1:
+                for row in axes:
+                    for ax in row:
+                        ax.plot(x_query, y_query[..., i])
+                        i += 1
+            elif n_rows > 1 or n_cols > 1:
+                for ax in axes:
+                    ax.plot(x_query, y_query[..., i])
+                    i += 1
+            else:
+                axes.plot(x_query, y_query[..., 0])
+
+        elif self.d_in == 2:
+            if x_min is None:
+                x_min = self.x.view(-1, self.d_in).min(dim=0).values
+            if x_max is None:
+                x_max = self.x.view(-1, self.d_in).max(dim=0).values
+            x_query = GridFunction.uniform_x(x_min, x_max, 300)
+            y_query = self(x_query)
+            if self.is_scalar:
+                y_query = y_query[..., None]
+
+            extent = (
+                float(x_min[1]) - 0.5/300, float(x_max[1]) + 0.5/300,
+                float(x_min[0]) - 0.5/300, float(x_max[0]) + 0.5/300
+            )
+
+            i = 0
+            if n_rows > 1 and n_cols > 1:
+                for row in axes:
+                    for ax in row:
+                        ax.imshow(y_query[..., i], origin='lower', extent=extent)
+                        i += 1
+            elif n_rows > 1 or n_cols > 1:
+                for ax in axes:
+                    ax.imshow(y_query[..., i], origin='lower', extent=extent)
+                    i += 1
+            else:
+                axes.imshow(y_query[..., i], origin='lower', extent=extent)
+        else:
+            raise ValueError('Visualization not supported for input dimension other than 1 or 2.')
+
+        plt.show()
+        fig.savefig('last_visualization.pdf')
+
 
 def _grid_interpolate(function: 'GridFunction', x, method, extend):
     """
@@ -344,9 +406,22 @@ class GridFunction(Function):
 
         xs = []
         for min_i, max_i, num_i in zip(min_point, max_point, num):
-            xs.append(torch.linspace(min_i, max_i, num_i + 1))
+            xs.append(torch.linspace(min_i, max_i, int(num_i) + 1))
 
         return xs
+
+    @staticmethod
+    def uniform_x(min_point, max_point, num):
+        """
+        Constructs the grid points for a uniform sampling grid in tensor form.
+        :param min_point: (d_in) Minimum coordinate values of input domain
+        :param max_point: (d_in) Maximum coordinate values of input domain
+        :param num: (d) or int, number of sampling points in each direction,
+            optionally one number to be used for all directions.
+        :return: (d_1, d_2, ..., d_{d_in}, d_in) the tensor of sampling points
+        """
+        xs = GridFunction.uniform_xs(min_point, max_point, num)
+        return torch.stack(torch.meshgrid(xs, indexing='ij'), dim=-1)
 
     @staticmethod
     def uniform_from_oracle(f, min_point, max_point, num, interpolator=None):
