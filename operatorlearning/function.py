@@ -79,15 +79,8 @@ def _grid_interpolate(function: 'GridFunction', x, method, extend):
     query_shape = x.shape[:-1]
     x = x.reshape(-1, function.d_in)  # (N, d_in)
 
-    min_tensor = torch.tensor(
-        [function.xs[i][0] for i in range(function.d_in)],
-        dtype=x.dtype, device=x.device
-    )[None]
-
-    max_tensor = torch.tensor(
-        [function.xs[i][-1] for i in range(function.d_in)],
-        dtype=x.dtype, device=x.device
-    )[None]
+    min_tensor = function.x_min[None]  # (1, d_in)
+    max_tensor = function.x_max[None]  # (1, d_in)
 
     extend_constant = False
     if extend == 'clamped':
@@ -103,20 +96,30 @@ def _grid_interpolate(function: 'GridFunction', x, method, extend):
     for i in range(function.d_in):
         left_indices_i = torch.searchsorted(function.xs[i], x[:, i].contiguous(), side='right') - 1
         left_indices_i[x[:, i] == function.xs[i][-1]] -= 1
-        left_indices.append(left_indices_i)
 
-        if extend_constant:
-            valid = torch.bitwise_and(left_indices_i >= 0, left_indices_i < (len(function.xs[i]) - 1))
+        if extend == 'periodic':
+            left_indices_i[left_indices_i == (len(function.xs[i]) - 1)] = -1
+            deltas = function.xs[i][left_indices_i + 1] - function.xs[i][left_indices_i]
+            ts_i = (x[:, i] - function.xs[i][left_indices_i]) / deltas
+        else:
+            # noinspection PyTypeChecker
+            valid = torch.bitwise_and(x[:, i] >= min_tensor[:, i], x[:, i] <= max_tensor[:, i])
             is_valid.append(valid)
-            left_indices_valid = left_indices_i[valid]
-            deltas_valid = function.xs[i][left_indices_valid + 1] - function.xs[i][left_indices_valid]
+
+            internal = torch.bitwise_and(
+                left_indices_i >= 0,
+                left_indices_i < (len(function.xs[i]) - 1)
+            )
+
+            left_indices_int = left_indices_i[internal]
+            deltas_int = function.xs[i][left_indices_int + 1] - function.xs[i][left_indices_int]
 
             ts_i = torch.zeros_like(x[:, i])
-            ts_i[valid] = (x[valid, i] - function.xs[i][left_indices_valid]) / deltas_valid
-            ts.append(ts_i)
-        else:
-            deltas = function.xs[i][left_indices_i + 1] - function.xs[i][left_indices_i]
-            ts.append((x[:, i] - function.xs[i][left_indices_i]) / deltas)
+            ts_i[internal] = (x[internal, i] - function.xs[i][left_indices_int]) / deltas_int
+            ts_i[left_indices_i == -1] = 1
+
+        left_indices.append(left_indices_i)
+        ts.append(ts_i)
 
     is_oob = None
     if extend_constant:
@@ -130,7 +133,10 @@ def _grid_interpolate(function: 'GridFunction', x, method, extend):
                 c = ((1 - ts[i]) if exponent[i] == 0 else ts[i]) * c
             # c has shape (N)
 
-            index = [left_indices[i] + exponent[i] for i in range(function.d_in)]
+            index = [
+                torch.minimum(left_indices[i] + exponent[i], torch.tensor(len(function.xs[i]) - 1))
+                for i in range(function.d_in)
+            ]
 
             if extend_constant:
                 for i in range(function.d_in):
@@ -211,14 +217,22 @@ class OracleInterpolator(Interpolator):
 
 
 class GridFunction(Function):
-    def __init__(self, y, x=None, interpolator: Interpolator | None = None, xs=None, is_sorted=False):
+    def __init__(
+            self,
+            y, x=None,
+            interpolator: Interpolator | None = None,
+            xs=None,
+            is_sorted=False,
+            x_min=None, x_max=None
+    ):
         """
         Create a tensor function with samples at the tensor product of the
         given sampling points.
         :param y: (..., d_out) or (...) the sample values
         :param x: (x_1, ..., x_{d_in}, d_in) tensor of coordinate values. Can
             be constructed from xs if not given (one or both of x or xs *must*
-            be given; do not give invalid combinations)
+            be given; do not give invalid combinations). Coordinates must be
+            sorted.
         :param interpolator: interpolates the function. Defaults to
             GridInterpolator
         :param xs: List [x_1, ..., x_{d_in}] of sampling coordinates in each
@@ -226,6 +240,10 @@ class GridFunction(Function):
             interpolation, for example). Can be inferred from x if not given.
         :param is_sorted: If xs is given, whether it is already sorted (do not
             lie about this!)
+        :param x_min: Indicates the minimum point of the rectangular domain.
+            Taken to be the minimum of the given sampling points if not given.
+        :param x_max: Indicates the maximum point of the rectangular domain.
+            Taken to be the maximum of the given sampling points if not given.
         """
 
         if x is not None:
@@ -247,7 +265,6 @@ class GridFunction(Function):
             else:
                 self.xs = [torch.sort(x_i)[0] for x_i in xs]
 
-
             x = torch.stack(torch.meshgrid(self.xs, indexing='ij'), dim=-1)
         else:
             raise ValueError('Must provide one or both of x and xs')
@@ -255,6 +272,20 @@ class GridFunction(Function):
 
         if interpolator is None:
             interpolator = GridInterpolator()
+
+        if x_min is None:
+            x_min = torch.tensor(
+                [self.xs[i][0] for i in range(len(self.xs))],
+                dtype=x.dtype, device=x.device
+            )
+        self.x_min = x_min
+
+        if x_max is None:
+            x_max = torch.tensor(
+                [self.xs[i][-1] for i in range(len(self.xs))],
+                dtype=x.dtype, device=x.device
+            )
+        self.x_max = x_max
 
         super(GridFunction, self).__init__(y, x, interpolator)
 
