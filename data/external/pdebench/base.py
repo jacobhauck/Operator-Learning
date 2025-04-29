@@ -1,14 +1,17 @@
-import os
+import abc
+import hashlib
 import json
 import math
-import hashlib
+import os
 
-import torch.utils.data
+import h5py
+import numpy as np
 import pandas
 import requests
+import torch.utils.data
 import tqdm
 
-import operatorlearning.function as olf
+import operatorlearning as ol
 
 
 CACHE_PATH = '.pdebench.cache'
@@ -246,6 +249,54 @@ class _Database:
 
         return candidates
 
+    def cached_datasets(self):
+        for record in self.records:
+            if record.is_downloaded():
+                yield record
+
+
+class _PDEBenchDatasetInterface(abc.ABC):
+    def __init__(self, db_record):
+        self.db_record = db_record
+
+    @abc.abstractmethod
+    def calc_length(self):
+        raise NotImplemented
+
+    @abc.abstractmethod
+    def get_data(self, index):
+        raise NotImplemented
+
+
+class _Interface1D(_PDEBenchDatasetInterface):
+    def __init__(self, db_record):
+        super(_Interface1D, self).__init__(db_record)
+        self.file = h5py.File(next(db_record.local_file_paths))
+
+    def calc_length(self):
+        return self.file['tensor'].shape[0]
+
+    def get_data(self, index):
+        y = torch.from_numpy(np.array(self.file['tensor'][index]))
+        t = torch.linspace(*self.db_record.temporal_interval, self.db_record.temporal_shape).to(y)
+        x = np.linspace(*self.db_record.spatial_interval[0], self.db_record.spatial_shape[0], endpoint=False)
+        x += (x[1] - x[0]) / 2
+        x = torch.from_numpy(x).to(y)
+
+        f = ol.GridFunction(
+            y, xs=[t, x], is_sorted=True,
+            x_min=torch.tensor([self.db_record.temporal_interval[0], self.db_record.spatial_interval[0][0]]),
+            x_max=torch.tensor([self.db_record.temporal_interval[1], self.db_record.spatial_interval[0][1]])
+        )
+        f.interpolator.extend = 'periodic'
+
+        return f
+
+
+_interface_classes = {
+    'advection': _Interface1D,
+    'burgers': _Interface1D
+}
 
 class PDEBenchStandardDataset(torch.utils.data.Dataset):
     def __init__(self, pde, dimension, **params):
@@ -253,4 +304,11 @@ class PDEBenchStandardDataset(torch.utils.data.Dataset):
         if len(candidates) != 1:
             raise ValueError('Identification parameters did not determine a unique dataset.')
 
-        self.database_record = candidates[0]
+        self._interface = _interface_classes[pde](candidates[0])
+        self._length = self._interface.calc_length()
+
+    def __len__(self):
+        return self._length
+
+    def __getitem__(self, item):
+        return self._interface.get_data(item)
