@@ -1,5 +1,7 @@
 import data.external.pdebench as pdb
 
-d = pdb.PDEBenchStandardDataset('reaction-diffusion', 1, nu=0.5, rho=1.0)
+d = pdb.PDEBenchStandardDataset('reaction-diffusion', 2)
 f = d[2]
-f.quick_visualize()
+
+ic = f.trace(0, 0).quick_visualize()
+fc = f.trace(-1, 0).quick_visualize()

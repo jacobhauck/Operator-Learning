@@ -57,6 +57,19 @@ def calc_md5(file_path, chunk_size=None):
     return md5.hexdigest()
 
 
+def file_size(url):
+    """
+    Checks how large a file is at the given URL.
+    :param url: The file URL
+    :return: How many bytes the file occupies
+    """
+    with requests.get(url, stream=True) as response:
+        response.raise_for_status()
+        assert 'Content-Length' in response.headers, 'Cannot find file size in headers'
+
+        return int(response.headers['Content-Length'])
+
+
 def download_file(url, root, file_name=None, chunk_size=1024*1024, md5=None):
     """
     Downloads a file from a given URL using streaming.
@@ -169,6 +182,10 @@ class _DatabaseRecord:
         return all(os.path.exists(file) for file in self.local_file_paths)
 
     @property
+    def file_size(self):
+        return sum(file_size(url) for url in self.urls)
+
+    @property
     def pde(self):
         return self._pde
 
@@ -258,9 +275,14 @@ class _Database:
         return candidates
 
     def cached_datasets(self):
+        """Get dataset records for all cached datasets"""
         for record in self.records:
             if record.is_downloaded():
                 yield record
+
+    def calc_total_size(self):
+        """Compute total size in bytes of all dataset files"""
+        return sum(record.file_size for record in self.records)
 
 
 class _PDEBenchDatasetInterface(abc.ABC):
@@ -353,13 +375,95 @@ class _InterfaceDiffusionSorption1D(_Interface1D):
         return f
 
 
+class _InterfaceReactionDiffusion2D(_PDEBenchDatasetInterface):
+    def __init__(self, db_record):
+        super(_InterfaceReactionDiffusion2D, self).__init__(db_record)
+        self.file = h5py.File(next(db_record.local_file_paths))
+        self.keys = list(self.file.keys())
+
+        t = torch.linspace(*self.db_record.temporal_interval, self.db_record.temporal_shape)
+
+        x0 = np.linspace(*self.db_record.spatial_interval[0], self.db_record.spatial_shape[0], endpoint=False)
+        x0 += (x0[1] - x0[0]) / 2
+        x0 = torch.from_numpy(x0).to(t)
+
+        x1 = np.linspace(*self.db_record.spatial_interval[1], self.db_record.spatial_shape[1], endpoint=False)
+        x1 += (x1[1] - x1[0]) / 2
+        x1 = torch.from_numpy(x1).to(t)
+
+        self.x = ol.GridFunction.build_x([t, x0, x1], is_sorted=True)
+        self.x_min = torch.tensor([
+            self.db_record.temporal_interval[0],
+            self.db_record.spatial_interval[0][0], self.db_record.spatial_interval[1][0]
+        ])
+        self.x_max = torch.tensor([
+            self.db_record.temporal_interval[1],
+            self.db_record.spatial_interval[0][1], self.db_record.spatial_interval[1][1]
+        ])
+
+    def calc_length(self):
+        return len(self.keys)
+
+    def get_data(self, index):
+        y = torch.from_numpy(np.array(self.file[self.keys[index]]['data']))
+
+        f = ol.GridFunction(
+            y, x=self.x, is_sorted=True,
+            x_min=self.x_min,
+            x_max=self.x_max,
+            in_components=['t', 'x0', 'x1'],
+            out_components=['activator', 'inhibitor']
+        )
+        f.interpolator.extend = 'periodic'
+
+        return f
+
+class _InterfaceDarcy2D(_PDEBenchDatasetInterface):
+    def __init__(self, db_record):
+        super(_InterfaceDarcy2D, self).__init__(db_record)
+        self.file = h5py.File(next(db_record.local_file_paths))
+
+        base = torch.from_numpy(np.array(self.file['tensor'][0, 0, 0, 0:1]))
+
+        x0 = np.linspace(*self.db_record.spatial_interval[0], self.db_record.spatial_shape[0], endpoint=False)
+        x0 += (x0[1] - x0[0]) / 2
+        x0 = torch.from_numpy(x0).to(base)
+
+        x1 = np.linspace(*self.db_record.spatial_interval[1], self.db_record.spatial_shape[1], endpoint=False)
+        x1 += (x1[1] - x1[0]) / 2
+        x1 = torch.from_numpy(x1).to(base)
+
+        self.x = ol.GridFunction.build_x([x0, x1], is_sorted=True)
+        self.x_min = torch.tensor([self.db_record.spatial_interval[0][0], self.db_record.spatial_interval[1][0]])
+        self.x_max = torch.tensor([self.db_record.spatial_interval[0][1], self.db_record.spatial_interval[1][1]])
+
+    def calc_length(self):
+        return self.file['tensor'].shape[0]
+
+    def get_data(self, index):
+        y = torch.from_numpy(np.array(self.file['tensor'][index, 0]))
+
+        f = ol.GridFunction(
+            y, x=self.x, is_sorted=True,
+            x_min=self.x_min,
+            x_max=self.x_max,
+            in_components=['x0', 'x1']
+        )
+        f.interpolator.extend = 'periodic'
+
+        return f
+
+
 _interface_classes = {
     ('advection', 1): _Interface1D,
     ('burgers', 1): _Interface1D,
     ('comp-navier-stokes', 1): _InterfaceNS1D,
     ('diffusion-sorption', 1): _InterfaceDiffusionSorption1D,
-    ('reaction-diffusion', 1): _Interface1D
+    ('reaction-diffusion', 1): _Interface1D,
+    ('darcy', 2): _InterfaceDarcy2D,
+    ('reaction-diffusion', 2): _InterfaceReactionDiffusion2D
 }
+
 
 class PDEBenchStandardDataset(torch.utils.data.Dataset):
     def __init__(self, pde, dimension, **params):
