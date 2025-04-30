@@ -17,12 +17,21 @@ class Interpolator(ABC):
 
 
 class Function(torch.nn.Module):
-    def __init__(self, y, x, interpolator: Interpolator):
+    def __init__(
+            self, y, x,
+            interpolator: Interpolator,
+            in_components: Sequence[str] | None = None,
+            out_components: Sequence[str] | None = None
+    ):
         """
         Create a sampled function object
         :param y: (..., d_out) or (...) the sampled function values
         :param x: (..., d_in) the sampling points
         :param interpolator: interpolator to use for evaluation
+        :param in_components: names of the input components of the function, if
+            given.
+        :param out_components: names of the output components of the function,
+            if given.
         """
         super(Function, self).__init__()
 
@@ -35,6 +44,48 @@ class Function(torch.nn.Module):
              'last dimension')
 
         self.interpolator = interpolator
+
+        if in_components is not None:
+            assert len(in_components) == len(set(in_components)) == self.d_in, \
+                'Input component names must be unique and match d_in in number.'
+
+            self._in_index = {name: i for i, name in enumerate(in_components)}
+            self.in_components = tuple(in_components)
+        else:
+            self._in_index = {}
+            self.in_components = None
+
+        if out_components is not None:
+            assert len(out_components) == len(set(out_components)) == self.d_out,  \
+                'Output component names must be unique and match d_out in number.'
+
+            self._out_index = {name: i for i, name in enumerate(in_components)}
+            self.out_components = tuple(out_components)
+        else:
+            self._out_index = {}
+            self.out_components = out_components
+
+    def ii(self, name: str):
+        """
+        Gets the index of a given input component
+        :param name: Name of the component
+        :return: Index of the component
+        """
+        if name not in self._in_index:
+            raise ValueError('Invalid input component name')
+
+        return self._in_index[name]
+
+    def oi(self, name: str):
+        """
+        Gets the index of a given output component
+        :param name: Name of the component
+        :return: Index of the component
+        """
+        if name not in self._out_index:
+            raise ValueError('Invalid output component name')
+
+        return self._out_index[name]
 
     @property
     def d_in(self):
@@ -143,7 +194,6 @@ def _grid_interpolate(function: 'GridFunction', x, method, extend):
 
     min_tensor = function.x_min[None]  # (1, d_in)
     max_tensor = function.x_max[None]  # (1, d_in)
-
     extend_constant = False
     if extend == 'clamped':
         x = torch.clamp(x, min_tensor, max_tensor)
@@ -285,7 +335,9 @@ class GridFunction(Function):
             interpolator: Interpolator | None = None,
             xs=None,
             is_sorted=False,
-            x_min=None, x_max=None
+            x_min=None, x_max=None,
+            in_components: Sequence[str] | None = None,
+            out_components: Sequence[str] | None = None
     ):
         """
         Create a tensor function with samples at the tensor product of the
@@ -306,6 +358,10 @@ class GridFunction(Function):
             Taken to be the minimum of the given sampling points if not given.
         :param x_max: Indicates the maximum point of the rectangular domain.
             Taken to be the maximum of the given sampling points if not given.
+        :param in_components: names of the input components of the function, if
+            given.
+        :param out_components: names of the output components of the function,
+            if given.
         """
 
         if x is not None:
@@ -349,10 +405,32 @@ class GridFunction(Function):
             )
         self.x_max = x_max
 
-        super(GridFunction, self).__init__(y, x, interpolator)
+        super(GridFunction, self).__init__(
+            y, x, interpolator,
+            in_components=in_components, out_components=out_components
+        )
 
     @staticmethod
-    def from_oracle(f, x=None, interpolator: Interpolator | None = None, xs=None, is_sorted=False):
+    def build_x(xs, is_sorted=True):
+        """
+        Construct the x tensor from a list of xs.
+        :param xs: list of tensors giving coordinates along each dimension
+        :param is_sorted: Whether the coordinates in xs are sorted
+        :return: (d_1, d_2, ... d_{d_in}, d_in) tensor of x coordinates
+        """
+        if not is_sorted:
+            xs = [torch.sort(x_i)[0] for x_i in xs]
+
+        return torch.stack(torch.meshgrid(xs, indexing='ij'), dim=-1)
+
+    @staticmethod
+    def from_oracle(
+            f, x=None,
+            interpolator: Interpolator | None = None,
+            xs=None, is_sorted=False,
+            in_components: Sequence[str] | None = None,
+            out_components: Sequence[str] | None = None
+    ):
         """
         Constructs a GridFunction from an oracle
         :param f: The oracle, maps (..., d_in) to (..., d_out)
@@ -364,6 +442,10 @@ class GridFunction(Function):
         :param is_sorted: Whether the sampling points are given in sorted order
             (if xs is provided); points will be sorted for interpolation
             efficiency if False is provided. Default: False.
+        :param in_components: names of the input components of the function, if
+            given.
+        :param out_components: names of the output components of the function,
+            if given.
         """
         if x is None:
             if is_sorted:
@@ -381,7 +463,10 @@ class GridFunction(Function):
         if interpolator is None:
             interpolator = OracleInterpolator(f)
 
-        return GridFunction(y, x=x, interpolator=interpolator, xs=xs, is_sorted=True)
+        return GridFunction(
+            y, x=x, interpolator=interpolator, xs=xs, is_sorted=True,
+            in_components=in_components, out_components=out_components
+        )
 
     @staticmethod
     def uniform_xs(min_point, max_point, num):
@@ -424,7 +509,11 @@ class GridFunction(Function):
         return torch.stack(torch.meshgrid(xs, indexing='ij'), dim=-1)
 
     @staticmethod
-    def uniform_from_oracle(f, min_point, max_point, num, interpolator=None):
+    def uniform_from_oracle(
+            f, min_point, max_point, num, interpolator=None,
+            in_components: Sequence[str] | None = None,
+            out_components: Sequence[str] | None = None
+    ):
         """
         Create a GridFunction on a uniform grid from an oracle.
         :param f: The oracle, maps (..., d_in) to (..., d_out)
@@ -434,10 +523,16 @@ class GridFunction(Function):
             direction, optionally one number to be used for all directions
         :param interpolator: optional interpolator; if not given, an
             OracleInterpolator is used with the given oracle
+        :param in_components: names of the input components of the function, if
+            given.
+        :param out_components: names of the output components of the function,
+            if given.
         """
         return GridFunction.from_oracle(
             f,
             xs=GridFunction.uniform_xs(min_point, max_point, num),
             is_sorted=True,
-            interpolator=interpolator
+            interpolator=interpolator,
+            in_components=in_components,
+            out_components=out_components
         )
