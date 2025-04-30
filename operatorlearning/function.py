@@ -1,5 +1,6 @@
 import itertools
 from abc import ABC, abstractmethod
+from typing import Sequence
 
 import torch
 
@@ -263,9 +264,15 @@ def _grid_interpolate(function: 'GridFunction', x, method, extend):
         left_indices_i[x[:, i] == function.xs[i][-1]] -= 1
 
         if extend == 'periodic':
-            left_indices_i[left_indices_i == (len(function.xs[i]) - 1)] = -1
+            left = (left_indices_i == -1)
+            right = (left_indices_i == (len(function.xs[i]) - 1))
+            left_indices_i[right] = -1
             deltas = function.xs[i][left_indices_i + 1] - function.xs[i][left_indices_i]
+            # noinspection PyTypeChecker
+            deltas[torch.bitwise_or(left, right)] += function.x_max[i] - function.x_min[i]
             ts_i = (x[:, i] - function.xs[i][left_indices_i]) / deltas
+            ts_i[left] += (function.x_max[i] - function.x_min[i]) / deltas[left]
+
         else:
             # noinspection PyTypeChecker
             valid = torch.bitwise_and(x[:, i] >= min_tensor[:, i], x[:, i] <= max_tensor[:, i])
@@ -426,7 +433,7 @@ class GridFunction(Function):
                     # noinspection PyTypeChecker
                     extraction_tuple[i] = slice(None)
                     extraction_tuple[-1] = i
-                    self.xs.append(x[*extraction_tuple])
+                    self.xs.append(x[*extraction_tuple].contiguous())
             else:
                 self.xs = xs
 
