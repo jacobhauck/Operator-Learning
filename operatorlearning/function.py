@@ -470,6 +470,42 @@ class GridFunction(Function):
             in_components=in_components, out_components=out_components
         )
 
+    def trace(self, index: int, dim: int):
+        """
+        Return a GridFunction that is the same as this one but with one
+        input coordinate held constant: x[dim] == self.xs[dim][index].
+        This reduces d_in by 1.
+
+        The restriction of a function to an input domain manifold one dimension
+        lower than the orginal domain is sometimes called the *trace* of the
+        function.
+
+        :param index: The index of the constant value of the coordinate
+        :param dim: Which coordinate dimension to hold constant
+        :return: A GridFunction representing the trace of this function along
+            the hyperplane x[dim] = self.xs[dim][index] intersected with the
+            domain of this function.
+        """
+        assert dim < self.d_in, 'Invalid coordinate dimension'
+        assert -len(self.xs[dim]) <= index < len(self.xs[dim]), 'Invalid coordinate index'
+
+        take = [slice(None) if i != dim else index for i in range(self.d_in)]
+        if not self.is_scalar:
+            take.append(slice(None))
+
+        take_i = [i for i in range(self.d_in) if i != dim]
+        take_xs = [self.xs[i] for i in take_i]
+        take_in_components = None
+        if self.in_components is not None:
+            take_in_components = [self.in_components[i] for i in take_i]
+
+        return GridFunction(
+            self.y[*take],
+            xs=take_xs, is_sorted=True,
+            x_min=self.x_min[take_i], x_max=self.x_max[take_i],
+            in_components=take_in_components, out_components=self.out_components
+        )
+
     @staticmethod
     def build_x(xs, is_sorted=True):
         """
