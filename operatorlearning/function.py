@@ -109,18 +109,35 @@ class Function(torch.nn.Module):
 
         return self.interpolator.interpolate(self, x_query)
 
-    def quick_visualize(self, x_min=None, x_max=None):
+    def quick_visualize(self, x_min=None, x_max=None, resolution: int | Sequence[int] = 300):
         import matplotlib.pyplot as plt
+        import numpy as np
+
+        try:
+            if len(resolution) != self.d_in:
+                raise ValueError('Invalid resolution')
+        except TypeError:
+            resolution = [resolution] * self.d_in
+
+        resolution = torch.from_numpy(np.array(resolution))
+
         n_rows = max(1, int(self.d_out**.5 / 2))
         n_cols = (self.d_out + n_rows - 1) // n_rows
         fig, axes = plt.subplots(n_rows, n_cols)
 
         if self.d_in == 1:
             if x_min is None:
-                x_min = float(self.x.min())
+                if hasattr(self, 'x_min'):
+                    x_min = float(self.x_min)
+                else:
+                    x_min = float(self.x.min())
             if x_max is None:
-                x_max = float(self.x.max())
-            x_query = torch.linspace(x_min, x_max, 1000)
+                if hasattr(self, 'x_max'):
+                    x_max = float(self.x_max)
+                else:
+                    x_max = float(self.x.max())
+
+            x_query = torch.linspace(x_min, x_max, resolution[0])
             y_query = self(x_query)
             if self.is_scalar:
                 y_query = y_query[..., None]
@@ -130,41 +147,77 @@ class Function(torch.nn.Module):
                 for row in axes:
                     for ax in row:
                         ax.plot(x_query, y_query[..., i])
+                        if self.out_components is not None:
+                            ax.set_title(self.out_components[i])
+                        if self.in_components is not None:
+                            ax.set_xlabel(self.in_components[0])
                         i += 1
             elif n_rows > 1 or n_cols > 1:
                 for ax in axes:
                     ax.plot(x_query, y_query[..., i])
+                    if self.out_components is not None:
+                        ax.set_title(self.out_components[i])
+                    if self.in_components is not None:
+                        ax.set_xlabel(self.in_components[0])
                     i += 1
             else:
                 axes.plot(x_query, y_query[..., 0])
+                if self.out_components is not None:
+                    axes.set_title(self.out_components[0])
+                if self.in_components is not None:
+                    axes.set_xlabel(self.in_components[0])
 
         elif self.d_in == 2:
             if x_min is None:
-                x_min = self.x.view(-1, self.d_in).min(dim=0).values
+                if hasattr(self, 'x_min'):
+                    x_min = self.x_min
+                else:
+                    x_min = self.x.view(-1, self.d_in).min(dim=0).values
             if x_max is None:
-                x_max = self.x.view(-1, self.d_in).max(dim=0).values
-            x_query = GridFunction.uniform_x(x_min, x_max, 300)
+                if hasattr(self, 'x_max'):
+                    x_max = self.x_max
+                else:
+                    x_max = self.x.view(-1, self.d_in).max(dim=0).values
+
+            extent = (
+                float(x_min[1]), float(x_max[1]),
+                float(x_min[0]), float(x_max[0])
+            )
+            x_min = x_min + 0.5 / resolution.to(x_min)
+            x_max = x_max - 0.5 / resolution.to(x_max)
+
+            x_query = GridFunction.uniform_x(x_min, x_max, resolution)
             y_query = self(x_query)
             if self.is_scalar:
                 y_query = y_query[..., None]
-
-            extent = (
-                float(x_min[1]) - 0.5/300, float(x_max[1]) + 0.5/300,
-                float(x_min[0]) - 0.5/300, float(x_max[0]) + 0.5/300
-            )
 
             i = 0
             if n_rows > 1 and n_cols > 1:
                 for row in axes:
                     for ax in row:
                         ax.imshow(y_query[..., i], origin='lower', extent=extent)
+                        if self.out_components is not None:
+                            ax.set_title(self.out_components[i])
+                        if self.in_components is not None:
+                            ax.set_xlabel(self.in_components[1])
+                            ax.set_ylabel(self.in_components[0])
                         i += 1
             elif n_rows > 1 or n_cols > 1:
                 for ax in axes:
                     ax.imshow(y_query[..., i], origin='lower', extent=extent)
+                    if self.out_components is not None:
+                        ax.set_title(self.out_components[i])
+                    if self.in_components is not None:
+                        ax.set_xlabel(self.in_components[1])
+                        ax.set_ylabel(self.in_components[0])
                     i += 1
             else:
                 axes.imshow(y_query[..., i], origin='lower', extent=extent)
+                if self.out_components is not None:
+                    axes.set_title(self.out_components[0])
+                if self.in_components is not None:
+                    axes.set_xlabel(self.in_components[1])
+                    axes.set_ylabel(self.in_components[0])
         else:
             raise ValueError('Visualization not supported for input dimension other than 1 or 2.')
 
@@ -483,7 +536,7 @@ class GridFunction(Function):
         try:
             num = int(num)
             num = num * torch.ones_like(min_point)
-        except ValueError:
+        except (ValueError, TypeError):
             assert len(num) == len(min_point), \
                 'Numbers of sampling points must have same dimension as min and max points'
 
