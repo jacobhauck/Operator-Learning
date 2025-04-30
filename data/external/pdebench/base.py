@@ -227,6 +227,14 @@ class _Database:
         self.records = self.raw_metadata.groupby('ID').apply(_DatabaseRecord)
 
     def find_datasets(self, pde, dimension, **params):
+        """
+        Find all datasets with the given parameters.
+        :param pde: Name of the PDE
+        :param dimension: Spatial dimension of the PDE
+        :param params: Any other parameter values to search for
+        :return: List of database records for datasets satisfying the given
+            conditions.
+        """
         candidates = []
 
         for record in self.records:
@@ -273,20 +281,72 @@ class _Interface1D(_PDEBenchDatasetInterface):
         super(_Interface1D, self).__init__(db_record)
         self.file = h5py.File(next(db_record.local_file_paths))
 
+        t = torch.linspace(*self.db_record.temporal_interval, self.db_record.temporal_shape)
+        x = np.linspace(*self.db_record.spatial_interval[0], self.db_record.spatial_shape[0], endpoint=False)
+        x += (x[1] - x[0]) / 2
+        x = torch.from_numpy(x).to(t)
+        self.x = ol.GridFunction.build_x([t, x], is_sorted=True)
+        self.x_min = torch.tensor([self.db_record.temporal_interval[0], self.db_record.spatial_interval[0][0]])
+        self.x_max = torch.tensor([self.db_record.temporal_interval[1], self.db_record.spatial_interval[0][1]])
+
     def calc_length(self):
         return self.file['tensor'].shape[0]
 
     def get_data(self, index):
         y = torch.from_numpy(np.array(self.file['tensor'][index]))
-        t = torch.linspace(*self.db_record.temporal_interval, self.db_record.temporal_shape).to(y)
-        x = np.linspace(*self.db_record.spatial_interval[0], self.db_record.spatial_shape[0], endpoint=False)
-        x += (x[1] - x[0]) / 2
-        x = torch.from_numpy(x).to(y)
 
         f = ol.GridFunction(
-            y, xs=[t, x], is_sorted=True,
-            x_min=torch.tensor([self.db_record.temporal_interval[0], self.db_record.spatial_interval[0][0]]),
-            x_max=torch.tensor([self.db_record.temporal_interval[1], self.db_record.spatial_interval[0][1]])
+            y, x=self.x, is_sorted=True,
+            x_min=self.x_min,
+            x_max=self.x_max,
+            in_components=['t', 'x']
+        )
+        f.interpolator.extend = 'periodic'
+
+        return f
+
+
+class _InterfaceNS1D(_Interface1D):
+    def __init__(self, db_record):
+        super(_InterfaceNS1D, self).__init__(db_record)
+
+    def calc_length(self):
+        return self.file['Vx'].shape[0]
+
+    def get_data(self, index):
+        vx = torch.from_numpy(np.array(self.file['Vx'][index]))
+        pressure = torch.from_numpy(np.array(self.file['pressure'][index]))
+        density = torch.from_numpy(np.array(self.file['density'][index]))
+        y = torch.stack([vx, pressure, density], dim=-1)
+
+        f = ol.GridFunction(
+            y, x=self.x, is_sorted=True,
+            x_min=self.x_min,
+            x_max=self.x_max,
+            in_components=['t', 'x'],
+            out_components=['vx', 'pressure', 'density']
+        )
+        f.interpolator.extend = 'periodic'
+
+        return f
+
+
+class _InterfaceDiffusionSorption1D(_Interface1D):
+    def __init__(self, db_record):
+        super(_InterfaceDiffusionSorption1D, self).__init__(db_record)
+        self.keys = list(self.file.keys())
+
+    def calc_length(self):
+        return len(self.keys)
+
+    def get_data(self, index):
+        y = torch.from_numpy(np.array(self.file[self.keys[index]]['data'])).squeeze()
+
+        f = ol.GridFunction(
+            y, x=self.x, is_sorted=True,
+            x_min=self.x_min,
+            x_max=self.x_max,
+            in_components=['t', 'x']
         )
         f.interpolator.extend = 'periodic'
 
@@ -294,8 +354,11 @@ class _Interface1D(_PDEBenchDatasetInterface):
 
 
 _interface_classes = {
-    'advection': _Interface1D,
-    'burgers': _Interface1D
+    ('advection', 1): _Interface1D,
+    ('burgers', 1): _Interface1D,
+    ('comp-navier-stokes', 1): _InterfaceNS1D,
+    ('diffusion-sorption', 1): _InterfaceDiffusionSorption1D,
+    ('reaction-diffusion', 1): _Interface1D
 }
 
 class PDEBenchStandardDataset(torch.utils.data.Dataset):
@@ -304,8 +367,20 @@ class PDEBenchStandardDataset(torch.utils.data.Dataset):
         if len(candidates) != 1:
             raise ValueError('Identification parameters did not determine a unique dataset.')
 
-        self._interface = _interface_classes[pde](candidates[0])
+        self._interface = _interface_classes[(pde, dimension)](candidates[0])
         self._length = self._interface.calc_length()
+
+    @property
+    def grid(self):
+        return self._interface.x
+
+    @property
+    def x_min(self):
+        return self._interface.x_min
+
+    @property
+    def x_max(self):
+        return self._interface.x_max
 
     def __len__(self):
         return self._length
