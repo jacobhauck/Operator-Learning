@@ -1,6 +1,6 @@
 import data.external.pdebench as pdb
 
-d = pdb.PDEBenchStandardDataset('reaction-diffusion', 2)
+d = pdb.PDEBenchStandardDataset('shallow-water', 2)
 f = d[2]
 
 ic = f.trace(0, 0).quick_visualize()

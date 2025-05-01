@@ -329,9 +329,6 @@ class _Interface1D(_PDEBenchDatasetInterface):
 
 
 class _InterfaceNS1D(_Interface1D):
-    def __init__(self, db_record):
-        super(_InterfaceNS1D, self).__init__(db_record)
-
     def calc_length(self):
         return self.file['Vx'].shape[0]
 
@@ -375,9 +372,9 @@ class _InterfaceDiffusionSorption1D(_Interface1D):
         return f
 
 
-class _InterfaceReactionDiffusion2D(_PDEBenchDatasetInterface):
+class _Interface2D(_PDEBenchDatasetInterface, abc.ABC):
     def __init__(self, db_record):
-        super(_InterfaceReactionDiffusion2D, self).__init__(db_record)
+        super(_Interface2D, self).__init__(db_record)
         self.file = h5py.File(next(db_record.local_file_paths))
         self.keys = list(self.file.keys())
 
@@ -404,6 +401,8 @@ class _InterfaceReactionDiffusion2D(_PDEBenchDatasetInterface):
     def calc_length(self):
         return len(self.keys)
 
+
+class _InterfaceReactionDiffusion2D(_Interface2D):
     def get_data(self, index):
         y = torch.from_numpy(np.array(self.file[self.keys[index]]['data']))
 
@@ -417,6 +416,22 @@ class _InterfaceReactionDiffusion2D(_PDEBenchDatasetInterface):
         f.interpolator.extend = 'periodic'
 
         return f
+
+
+class _InterfaceShallowWater2D(_Interface2D):
+    def get_data(self, index):
+        y = torch.from_numpy(np.array(self.file[self.keys[index]]['data'])[..., 0])
+
+        f = ol.GridFunction(
+            y, x=self.x, is_sorted=True,
+            x_min=self.x_min,
+            x_max=self.x_max,
+            in_components=['t', 'x0', 'x1']
+        )
+        f.interpolator.extend = 'periodic'
+
+        return f
+
 
 class _InterfaceDarcy2D(_PDEBenchDatasetInterface):
     def __init__(self, db_record):
@@ -461,7 +476,8 @@ _interface_classes = {
     ('diffusion-sorption', 1): _InterfaceDiffusionSorption1D,
     ('reaction-diffusion', 1): _Interface1D,
     ('darcy', 2): _InterfaceDarcy2D,
-    ('reaction-diffusion', 2): _InterfaceReactionDiffusion2D
+    ('reaction-diffusion', 2): _InterfaceReactionDiffusion2D,
+    ('shallow-water', 2): _InterfaceShallowWater2D
 }
 
 
