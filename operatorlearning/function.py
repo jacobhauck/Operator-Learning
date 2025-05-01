@@ -477,7 +477,7 @@ class GridFunction(Function):
         This reduces d_in by 1.
 
         The restriction of a function to an input domain manifold one dimension
-        lower than the orginal domain is sometimes called the *trace* of the
+        lower than the original domain is sometimes called the *trace* of the
         function.
 
         :param index: The index of the constant value of the coordinate
