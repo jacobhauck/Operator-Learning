@@ -1,5 +1,4 @@
 import abc
-import hashlib
 import json
 import math
 import os
@@ -7,10 +6,9 @@ import os
 import h5py
 import numpy as np
 import pandas
-import requests
 import torch.utils.data
-import tqdm
 
+import data.external.utils as utils
 import operatorlearning as ol
 
 
@@ -26,93 +24,6 @@ def get_database():
         _database = _Database()
 
     return _database
-
-
-def calc_md5(file_path, chunk_size=None):
-    """
-    Calculates the MD5 checksum of a file.
-
-    :param file_path: Path to file to check
-    :param chunk_size: Size of chunk size to stream the file. None to load
-        the entire file in one chunk
-    :return: The MD5 checksum of the file
-    """
-    md5 = hashlib.md5(usedforsecurity=False)
-
-    with open(file_path, 'rb') as f:
-        # Read entire file and compute MD5 if chunk_size is None
-        if chunk_size is None:
-            md5.update(f.read())
-        else:
-            # Otherwise, read chunks from f and update the MD5 calculator
-            # one chunk at a time
-            while True:
-                chunk = f.read(chunk_size)
-                if len(chunk) == 0:
-                    break
-
-                md5.update(chunk)
-
-    # Return final MD5 value
-    return md5.hexdigest()
-
-
-def file_size(url):
-    """
-    Checks how large a file is at the given URL.
-    :param url: The file URL
-    :return: How many bytes the file occupies
-    """
-    with requests.get(url, stream=True) as response:
-        response.raise_for_status()
-        assert 'Content-Length' in response.headers, 'Cannot find file size in headers'
-
-        return int(response.headers['Content-Length'])
-
-
-def download_file(url, root, file_name=None, chunk_size=1024*1024, md5=None):
-    """
-    Downloads a file from a given URL using streaming.
-
-    :param url: The URL of the file to download.
-    :param root: The directory in which to store the downloaded file
-    :param file_name: The name of the downloaded file; uses the name from the
-        URL if None is given.
-    :param chunk_size: Streaming chunk size. Bigger chunk size means faster
-        download speed buy higher memory usage. Default = 1024kB.
-    :param md5: MD5 checksum to verify integrity of download (optional)
-    """
-    # Get file name from URL if not provided
-    if file_name is None:
-        file_name = url.split('/')[-1]
-
-    output_file = os.path.join(root, file_name)
-
-    # Get file using requests stream
-    with requests.get(url, stream=True) as response:
-        response.raise_for_status()
-
-        # Create progress bar
-        length = response.headers.get('Content-Length')
-        if length is not None:
-            length = int(length)
-        pbar = tqdm.tqdm(
-            total=length,
-            unit='B',
-            unit_scale=True
-        )
-
-        # Stream file
-        with open(output_file, 'wb') as f:
-            for chunk in response.iter_content(chunk_size=chunk_size):
-                f.write(chunk)
-                pbar.update(len(chunk))  # Use actual chunk length, not chunk_size
-        pbar.close()
-
-    # Check file integrity using MD5 checksum
-    if md5 is not None:
-        if calc_md5(output_file, chunk_size=1024*1024) != md5:
-            raise RuntimeError('Downloaded file was corrupted; please try again.')
 
 
 def _validate_cache(dir_name):
@@ -160,7 +71,7 @@ class _DatabaseRecord:
 
             print(f'Downloading file: {url}')
             print(f'File {file_num + 1}/{len(self._urls)}')
-            download_file(url, dir_name, file_name, chunk_size=chunk_size, md5=self.md5)
+            utils.download_file(url, dir_name, file_name, chunk_size=chunk_size, md5=self.md5)
 
             file_num += 1
 
@@ -183,7 +94,7 @@ class _DatabaseRecord:
 
     @property
     def file_size(self):
-        return sum(file_size(url) for url in self.urls)
+        return sum(utils.file_size(url) for url in self.urls)
 
     @property
     def pde(self):
@@ -469,6 +380,73 @@ class _InterfaceDarcy2D(_PDEBenchDatasetInterface):
         return f
 
 
+class _InterfaceIncompressibleNS(_PDEBenchDatasetInterface):
+    def __init__(self, db_record):
+        super(_InterfaceIncompressibleNS, self).__init__(db_record)
+        self.files = [h5py.File(path) for path in db_record.local_file_paths if os.path.exists(path)]
+        self._length = 0
+        self._offsets = []
+        for file in self.files:
+            self._offsets.append(self._length)
+            self._length += file['velocity'].shape[0]
+
+        t = torch.linspace(*self.db_record.temporal_interval, self.db_record.temporal_shape)
+
+        x0 = np.linspace(*self.db_record.spatial_interval[0], self.db_record.spatial_shape[0], endpoint=False)
+        x0 += (x0[1] - x0[0]) / 2
+        x0 = torch.from_numpy(x0).to(t)
+
+        x1 = np.linspace(*self.db_record.spatial_interval[1], self.db_record.spatial_shape[1], endpoint=False)
+        x1 += (x1[1] - x1[0]) / 2
+        x1 = torch.from_numpy(x1).to(t)
+
+        self.x = ol.GridFunction.build_x([t, x0, x1], is_sorted=True)
+        self.x_min = torch.tensor([
+            self.db_record.temporal_interval[0],
+            self.db_record.spatial_interval[0][0], self.db_record.spatial_interval[1][0]
+        ])
+        self.x_max = torch.tensor([
+            self.db_record.temporal_interval[1],
+            self.db_record.spatial_interval[0][1], self.db_record.spatial_interval[1][1]
+        ])
+
+        self.x_force = ol.GridFunction.build_x([x0, x1], is_sorted=True)
+        self.x_force_min = self.x_min[1:]
+        self.x_force_max = self.x_max[1:]
+
+    def calc_length(self):
+        return self._length
+
+    def get_data(self, index):
+        file_index = np.searchsorted(self._offsets, index, side='right') - 1
+        rel_index = index - self._offsets[file_index]
+        file = self.files[file_index]
+
+        force = torch.from_numpy(np.array(file['force'][rel_index]))
+        velocity = torch.from_numpy(np.array(file['velocity'][rel_index]))
+        pressure = torch.from_numpy(np.array(file['particles'][rel_index]))
+        y = torch.cat([pressure, velocity], dim=-1)
+
+        force_f = ol.GridFunction(
+            force, x=self.x_force,
+            x_min=self.x_force_min,
+            x_max=self.x_force_max,
+            in_components=['x0', 'x1'],
+            out_components=['f0', 'f1']
+        )
+        force_f.interpolator.extend = 'periodic'
+
+        f = ol.GridFunction(
+            y, x=self.x,
+            x_min=self.x_min,
+            x_max=self.x_max,
+            in_components=['t', 'x0', 'x1'],
+            out_components=['p', 'v0', 'v1']
+        )
+
+        return f, force_f
+
+
 _interface_classes = {
     ('advection', 1): _Interface1D,
     ('burgers', 1): _Interface1D,
@@ -477,7 +455,8 @@ _interface_classes = {
     ('reaction-diffusion', 1): _Interface1D,
     ('darcy', 2): _InterfaceDarcy2D,
     ('reaction-diffusion', 2): _InterfaceReactionDiffusion2D,
-    ('shallow-water', 2): _InterfaceShallowWater2D
+    ('shallow-water', 2): _InterfaceShallowWater2D,
+    ('incomp-navier-stokes', 2): _InterfaceIncompressibleNS
 }
 
 
