@@ -239,7 +239,7 @@ class _Interface1D(_PDEBenchDatasetInterface):
         return f
 
 
-class _InterfaceNS1D(_Interface1D):
+class _InterfaceCompressibleNS1D(_Interface1D):
     def calc_length(self):
         return self.file['Vx'].shape[0]
 
@@ -447,16 +447,41 @@ class _InterfaceIncompressibleNS(_PDEBenchDatasetInterface):
         return f, force_f
 
 
+class _InterfaceCompressibleNS2D(_Interface2D):
+    def calc_length(self):
+        return self.file['Vx'].shape[0]
+
+    def get_data(self, index):
+        rho = torch.from_numpy(np.array(self.file['density'][index]))
+        p = torch.from_numpy(np.array(self.file['pressure'][index]))
+        vx = torch.from_numpy(np.array(self.file['Vx'][index]))
+        vy = torch.from_numpy(np.array(self.file['Vy'][index]))
+
+        y = torch.stack([rho, p, vx, vy], dim=-1)
+
+        f = ol.GridFunction(
+            y, x=self.x,
+            x_min=self.x_min,
+            x_max=self.x_max,
+            in_components=['t', 'x0', 'x1'],
+            out_components=['rho', 'p', 'v0', 'v1']
+        )
+        f.interpolator.extend = 'periodic'
+
+        return f
+
+
 _interface_classes = {
     ('advection', 1): _Interface1D,
     ('burgers', 1): _Interface1D,
-    ('comp-navier-stokes', 1): _InterfaceNS1D,
+    ('comp-navier-stokes', 1): _InterfaceCompressibleNS1D,
     ('diffusion-sorption', 1): _InterfaceDiffusionSorption1D,
     ('reaction-diffusion', 1): _Interface1D,
     ('darcy', 2): _InterfaceDarcy2D,
     ('reaction-diffusion', 2): _InterfaceReactionDiffusion2D,
     ('shallow-water', 2): _InterfaceShallowWater2D,
-    ('incomp-navier-stokes', 2): _InterfaceIncompressibleNS
+    ('incomp-navier-stokes', 2): _InterfaceIncompressibleNS,
+    ('comp-navier-stokes', 2): _InterfaceCompressibleNS2D
 }
 
 
