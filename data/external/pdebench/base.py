@@ -471,6 +471,63 @@ class _InterfaceCompressibleNS2D(_Interface2D):
         return f
 
 
+class _InterfaceCompressibleNS3D(_PDEBenchDatasetInterface):
+    def __init__(self, db_record):
+        super(_InterfaceCompressibleNS3D, self).__init__(db_record)
+        self.file = h5py.File(next(db_record.local_file_paths))
+
+        t = torch.linspace(*self.db_record.temporal_interval, self.db_record.temporal_shape)
+
+        x0 = np.linspace(*self.db_record.spatial_interval[0], self.db_record.spatial_shape[0], endpoint=False)
+        x0 += (x0[1] - x0[0]) / 2
+        x0 = torch.from_numpy(x0).to(t)
+
+        x1 = np.linspace(*self.db_record.spatial_interval[1], self.db_record.spatial_shape[1], endpoint=False)
+        x1 += (x1[1] - x1[0]) / 2
+        x1 = torch.from_numpy(x1).to(t)
+
+        x2 = np.linspace(*self.db_record.spatial_interval[2], self.db_record.spatial_shape[2], endpoint=False)
+        x2 += (x2[1] - x2[0]) / 2
+        x2 = torch.from_numpy(x2).to(t)
+
+        self.x = ol.GridFunction.build_x([t, x0, x1, x2], is_sorted=True)
+        self.x_min = torch.tensor([
+            self.db_record.temporal_interval[0],
+            self.db_record.spatial_interval[0][0],
+            self.db_record.spatial_interval[1][0],
+            self.db_record.spatial_interval[2][0]
+        ])
+        self.x_max = torch.tensor([
+            self.db_record.temporal_interval[1],
+            self.db_record.spatial_interval[0][1],
+            self.db_record.spatial_interval[1][1],
+            self.db_record.spatial_interval[2][1]
+        ])
+
+    def calc_length(self):
+        return self.file['Vx'].shape[0]
+
+    def get_data(self, index):
+        rho = torch.from_numpy(np.array(self.file['density'][index]))
+        p = torch.from_numpy(np.array(self.file['pressure'][index]))
+        vx = torch.from_numpy(np.array(self.file['Vx'][index]))
+        vy = torch.from_numpy(np.array(self.file['Vy'][index]))
+        vz = torch.from_numpy(np.array(self.file['Vz'][index]))
+
+        y = torch.stack([rho, p, vx, vy, vz], dim=-1)
+
+        f = ol.GridFunction(
+            y, x=self.x,
+            x_min=self.x_min,
+            x_max=self.x_max,
+            in_components=['t', 'x0', 'x1', 'x2'],
+            out_components=['rho', 'p', 'v0', 'v1', 'v2']
+        )
+        f.interpolator.extend = 'periodic'
+
+        return f
+
+
 _interface_classes = {
     ('advection', 1): _Interface1D,
     ('burgers', 1): _Interface1D,
@@ -481,7 +538,8 @@ _interface_classes = {
     ('reaction-diffusion', 2): _InterfaceReactionDiffusion2D,
     ('shallow-water', 2): _InterfaceShallowWater2D,
     ('incomp-navier-stokes', 2): _InterfaceIncompressibleNS,
-    ('comp-navier-stokes', 2): _InterfaceCompressibleNS2D
+    ('comp-navier-stokes', 2): _InterfaceCompressibleNS2D,
+    ('comp-navier-stokes', 3): _InterfaceCompressibleNS3D
 }
 
 
