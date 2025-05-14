@@ -1,10 +1,11 @@
 import torch
 
 
-class DeepONet(torch.nn.Module):
+class AbstractDeepONet(torch.nn.Module):
     def __init__(self, x, branch_net, trunk_net, scale=None, bias=None):
         """
-        Implementation of vanilla DeepONet.
+        Implementation of a DeepONet with unspecified branch and trunk
+        architecture.
 
         :param x: (*in_shape, u_d_in) sensor points. u_d_in is the dimension of the domain
             of the input function u, and in_shape is an arbitrary shape.
