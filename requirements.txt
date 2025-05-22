@@ -9,3 +9,4 @@ pandas==2.1.4
 tqdm==4.67.1
 numpy==1.26.0
 h5py==3.10.0
+huggingface-hub==0.30.2
