@@ -39,7 +39,6 @@ class Function(torch.nn.Module):
         self.x = x
         self.y = y
         self.is_scalar = (len(self.y.shape) == len(self.x.shape) - 1)
-
         assert self.y.shape[:len(self.x.shape) - 1] == self.x.shape[:-1], \
             ('Sample values and sample points must have same shape in all but '
              'last dimension')
@@ -447,7 +446,6 @@ class GridFunction(Function):
         else:
             raise ValueError('Must provide one or both of x and xs')
 
-
         if interpolator is None:
             interpolator = GridInterpolator()
 
@@ -470,7 +468,7 @@ class GridFunction(Function):
             in_components=in_components, out_components=out_components
         )
 
-    def trace(self, index: int, dim: int):
+    def trace(self, index: int, dim: int | str):
         """
         Return a GridFunction that is the same as this one but with one
         input coordinate held constant: x[dim] == self.xs[dim][index].
@@ -481,11 +479,14 @@ class GridFunction(Function):
         function.
 
         :param index: The index of the constant value of the coordinate
-        :param dim: Which coordinate dimension to hold constant
+        :param dim: Which coordinate dimension to hold constant, either the
+            dimension name or index
         :return: A GridFunction representing the trace of this function along
             the hyperplane x[dim] = self.xs[dim][index] intersected with the
             domain of this function.
         """
+        if isinstance(dim, str):
+            dim = self.ii(dim)
         assert dim < self.d_in, 'Invalid coordinate dimension'
         assert -len(self.xs[dim]) <= index < len(self.xs[dim]), 'Invalid coordinate index'
 
@@ -548,7 +549,6 @@ class GridFunction(Function):
                 xs = xs
             else:
                 xs = [torch.sort(x_i)[0] for x_i in xs]
-
 
             x = torch.stack(torch.meshgrid(xs, indexing='ij'), dim=-1)
         else:

@@ -1,7 +1,9 @@
-import data.external.pdebench as pdb
+import data.external.cfdbench as cdb
 
-d = pdb.PDEBenchStandardDataset('comp-navier-stokes', 3, M=1.0, eta=1e-8, zeta=1e-8, boundary_conditions='periodic', initial_condition='random')
-state = d[2]
+d = cdb.CFDBenchDataset('cylinder-prop')
+state, metadata = d[5]
 
-state.trace(0, 0).trace(64, 0).quick_visualize()
-state.trace(-1, 0).trace(64, 0).quick_visualize()
+print(metadata)
+
+for t in range(0, len(state.xs[state.ii('t')]), 100):
+    state.trace(t, 't').quick_visualize()

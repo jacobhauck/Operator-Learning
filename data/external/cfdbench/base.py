@@ -8,20 +8,40 @@ import numpy as np
 import torch.utils.data
 from huggingface_hub import hf_hub_download
 
+import operatorlearning as ol
+
 
 CACHE_PATH = '.cfdbench.cache'
 HUGGINGFACE_REPO_ID = 'chen-yingfa/CFDBench'
+
+# All categories of datasets in the benchmark
 CATEGORIES = {
     'cylinder',
     'cavity',
     'dam',
     'tube'
 }
+
+# Datasets available within each category
 DATASETS = {
     'bc',
     'geo',
     'prop'
 }
+
+# Time step size by category
+TIME_STEPS = {
+    'cylinder': 0.001,
+    'dam': 0.1,
+    'tube': 0.01,
+    'cavity': 0.1
+}
+
+# Which fields to exclude from loaded metadata
+EXCLUDE = [
+    'width', 'height', 'dx', 'dy',  # Can all be inferred from the returned function
+
+]
 
 
 def _validate_cache(dir_name):
@@ -108,10 +128,18 @@ class CFDBenchDataset(torch.utils.data.Dataset):
             self._cases = os.listdir(self.folder_path)
         return len(self._cases)
 
+    @staticmethod
+    def _clean_metadata(d):
+        """Remove exclusions from metadata"""
+        for e in EXCLUDE:
+            d.pop(e, None)
+
     def __getitem__(self, item):
         """
         :param item: case number
-        :return:
+        :return: tuple (flow function, metadata). flow function is a `GridFunction` with
+            independent variable order t, y, x, and metadata is a dictionary containing
+            relevant parameters.
         """
         if self._cases is None:
             self._cases = os.listdir(self.folder_path)
@@ -121,4 +149,30 @@ class CFDBenchDataset(torch.utils.data.Dataset):
 
         u = torch.from_numpy(np.load(os.path.join(folder, 'u.npy')))
         v = torch.from_numpy(np.load(os.path.join(folder, 'v.npy')))
+        y = torch.stack([u, v], dim=-1)
 
+        x_min = torch.zeros(3)
+        if self.category == 'cylinder':
+            width = metadata['x_max'] - metadata['x_min'] + 2*metadata['radius']
+            height = metadata['y_max'] - metadata['y_min'] + 2*metadata['radius']
+            x_max = torch.tensor([TIME_STEPS[self.category] * (u.shape[0] - 1), height, width])
+        else:
+            x_max = torch.tensor([TIME_STEPS[self.category] * (u.shape[0] - 1), metadata['height'], metadata['width']])
+
+        t_coord = torch.linspace(0, x_max[0], u.shape[0])
+        y_coord = torch.linspace(x_min[1], x_max[1], u.shape[1] + 1)[:-1]
+        y_coord += (y_coord[1] - y_coord[0]) / 2
+        x_coord = torch.linspace(x_min[2], x_max[2], u.shape[2] + 1)[:-1]
+        x_coord += (x_coord[1] - x_coord[0]) / 2
+
+        f = ol.GridFunction(
+            y,
+            xs=[t_coord, y_coord, x_coord],
+            is_sorted=True,
+            x_min=x_min,
+            x_max=x_max,
+            in_components=('t', 'y', 'x'),
+            out_components=('u', 'v')
+        )
+
+        return f, metadata
