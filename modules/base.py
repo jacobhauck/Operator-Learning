@@ -1,7 +1,23 @@
-import torch
-from typing import Sequence, Union
+from typing import Sequence, Mapping
 
+import torch
+
+import modules
 import utils
+
+
+def create_module(config: Mapping):
+    """
+    Create a model from its configuration.
+
+    :param config: Dictionary of model configuration options. Must contain a
+        'name' field to specify which model to load, which refers to the model's
+        name within the `models` module.
+    :return: An instance of the model specified by the given configuration
+        settings.
+    """
+    config = dict(config)
+    return getattr(modules, config.pop('name'))(**config)
 
 
 class MLP(torch.nn.Module):

@@ -1,5 +1,6 @@
-import models
 from typing import Mapping
+
+import models
 
 
 def create_model(config: Mapping):
