@@ -1,20 +1,23 @@
 import torch
 
+import modules
 
-class AbstractDeepONet(torch.nn.Module):
-    def __init__(self, x, branch_net, trunk_net, scale=None, bias=None):
+
+class DeepONet(torch.nn.Module):
+    def __init__(self, x, branch_config, trunk_config, scale=None, bias=None):
         """
         Implementation of a DeepONet with unspecified branch and trunk
         architecture.
 
         :param x: (*in_shape, u_d_in) sensor points. u_d_in is the dimension of the domain
             of the input function u, and in_shape is an arbitrary shape.
-        :param branch_net: (B, *in_shape, u_d_out) -> (B, p) module implementing the
-            branch network. u_d_out is the number of components of u.
-        :param trunk_net: (B, *out_shape, v_d_in) -> (B, *out_shape, p, v_d_out) module
+        :param branch_config: (B, *in_shape, u_d_out) -> (B, p) module implementing the
+            branch network. u_d_out is the number of components of u. Provide
+            config for construction via modules.create_module().
+        :param trunk_config: (B, *out_shape, v_d_in) -> (B, *out_shape, p, v_d_out) module
             implementing the trunk network. v_d_in is the dimension of the domain
             of the output function v, and v_d_out is the number of components
-            of v.
+            of v. Provide config for construction via modules.create_module().
         :param scale: Scaling factor to apply. None <=> scale==1, 'linear' <=>
             scale==1/p, 'sqrt' <=> scale==1/p^.5, or one can supply any
             constant numerical value.
@@ -25,8 +28,8 @@ class AbstractDeepONet(torch.nn.Module):
         """
         super(DeepONet, self).__init__()
         self.register_buffer('x', x)
-        self.branch_net = branch_net
-        self.trunk_net = trunk_net
+        self.branch_net = modules.create_module(branch_config)
+        self.trunk_net = modules.create_module(trunk_config)
         self.scale = scale
         self._bias_is_module = False
         self._need_init = False
@@ -75,4 +78,3 @@ class AbstractDeepONet(torch.nn.Module):
                 self._need_init = False
 
             return scaled + self.bias.view(*([1] * (len(scaled.shape)-1)), -1)
-
