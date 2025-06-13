@@ -95,7 +95,7 @@ def run_experiment(
 
     # Run experiment/experiment group
     if group is None:
-        experiment.run(base_config)
+        experiment.run(base_config, name=name, group=None)
     else:
         # Load group configurations
         group_configs = []
@@ -111,13 +111,15 @@ def run_experiment(
                 print('Failed')
 
         # Run experiments
+        experiment.start_group()
         for config in group_configs:
             # Load run config and override base config. Make sure to deeply copy
             # base config so that options from one run don't bleed into
             # subsequent ones
             run_config = copy.deepcopy(base_config)
             utils.config.config_update_recursive(run_config, config, default_option='add')
-            experiment.run(run_config)
+            experiment.run(run_config, name=name, group=group)
+        experiment.finish_group()
 
 
 if __name__ == '__main__':

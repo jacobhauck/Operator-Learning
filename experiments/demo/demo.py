@@ -1,5 +1,5 @@
 """Simple demo experiment for testing run_experiment script."""
-from experiments import Experiment
+from experiments import WandBExperiment
 
 
 def _print(d, depth=0):
@@ -13,9 +13,10 @@ def _print(d, depth=0):
             print(' ' * (depth * 2) + f'{k}: {v}')
 
 
-class Demo(Experiment):
+class Demo(WandBExperiment):
     """Demonstration experiment that simply prints the provided config."""
 
-    def run(self, config):
+    def run_wandb(self, config, run):
         print('Running demo Experiment.')
+        print(run.name)
         _print(config)
