@@ -1,3 +1,9 @@
+"""
+Implementation of DeepONet.
+
+See:
+
+"""
 import torch
 
 import modules
