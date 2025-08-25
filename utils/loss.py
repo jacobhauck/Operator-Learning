@@ -16,7 +16,7 @@ def create_loss(config: Mapping):
 
     :param config: Dictionary of loss configuration options. Must contain a
         'name' field to specify which function to load, which refers to the
-        activation function's name within the torch.nn module, or else the name
+        loss function's name within the torch.nn module, or else the name
         used as a key in the utils.loss.custom_losses dictionary of
         custom loss functions.
     :return: An instance of the loss function specified by the given

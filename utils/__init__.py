@@ -1,3 +1,4 @@
-import activation
-import config
-import loss
+import utils.config
+from .activation import *
+from .optim import *
+from .loss import *

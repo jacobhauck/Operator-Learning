@@ -1,6 +1,9 @@
-import data.external.pdebench as pdb
+import data.external.cfdbench as cdb
 
-d = pdb.PDEBenchStandardDataset('incomp-navier-stokes', 2)
-fluid, force = d[2]
+d = cdb.CFDBenchDataset('cylinder-prop')
+state, metadata = d[5]
 
-force.quick_visualize()
+print(metadata)
+
+for t in range(0, len(state.xs[state.ii('t')]), 100):
+    state.trace(t, 't').quick_visualize()

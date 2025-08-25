@@ -1,6 +1,5 @@
+import importlib
 from typing import Mapping
-
-import models
 
 
 def create_model(config: Mapping):
@@ -14,4 +13,7 @@ def create_model(config: Mapping):
         settings.
     """
     config = dict(config)
-    return getattr(models, config.pop('name'))(**config)
+    name = ['models'] + config.pop('name').split('.')
+    py_module = importlib.import_module('.'.join(name[:-1]))
+
+    return getattr(py_module, name[-1])(**config)
