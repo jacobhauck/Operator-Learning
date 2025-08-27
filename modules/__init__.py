@@ -1,2 +1,3 @@
 from .base import *
-import deeponet
+from .standard import *
+import modules.deeponet
