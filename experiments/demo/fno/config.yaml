@@ -5,13 +5,13 @@ model:
   lift_config:
     name: MLP
     d_in: 1
-    d_out: 16
     hidden_layers:
       - 32
+    d_out: 16
     activation:
       name: GELU
 
-  num_fourier_layers: 2
+  num_fourier_layers: 1
   fourier_layer_config:
     conv_config:  # Use 4 modes in each direction for spectral conv
       n_modes:
@@ -28,8 +28,13 @@ model:
   project_config:
     name: MLP
     d_in: 16
-    d_out: 1
     hidden_layers:
       - 32
+    d_out: 1
     activation:
       name: GELU
+
+training:
+  lr: 0.001
+  iterations: 5000
+  batch_size: 1
