@@ -36,8 +36,8 @@ class Function(torch.nn.Module):
         """
         super(Function, self).__init__()
 
-        self.x = x
-        self.y = y
+        self.register_buffer('x', x)
+        self.register_buffer('y', y)
         self.is_scalar = (len(self.y.shape) == len(self.x.shape) - 1)
         assert self.y.shape[:len(self.x.shape) - 1] == self.x.shape[:-1], \
             ('Sample values and sample points must have same shape in all but '

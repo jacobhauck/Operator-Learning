@@ -5,7 +5,7 @@ import data.synthetic.poisson
 import operatorlearning as ol
 
 
-class FNODemoExperiment(experiments.Experiment):
+class DeepONetDemoExperiment(experiments.Experiment):
     def run(self, config, name, group=None):
         model = models.create_model(config['model'])
         optim = torch.optim.Adam(model.parameters(), lr=config['training']['lr'])
@@ -20,7 +20,11 @@ class FNODemoExperiment(experiments.Experiment):
         )
         loss_fn = torch.nn.MSELoss()
 
-        grid = ol.GridFunction.uniform_x(gen.a, gen.b, num=128)[:-1, :-1]
+        grid = ol.GridFunction.uniform_x(gen.a, gen.b, num=31)  # (H, W, 2)
+        grid_batch = torch.tile(
+            grid[None],
+            (config['training']['batch_size'],) + (1,) * len(grid.shape)
+        )  # (B, H, W, 2)
 
         for i in range(config['training']['iterations']):
             sources, solutions = gen(config['training']['batch_size'])
@@ -28,16 +32,31 @@ class FNODemoExperiment(experiments.Experiment):
             out_batch = torch.stack([sol(grid) for sol in solutions])  # (B, H, W, 1)
 
             optim.zero_grad()
-            pred_batch = model(in_batch)
+            pred_batch = model(u=in_batch, x_out=grid_batch)
             loss = loss_fn(pred_batch, out_batch) / loss_fn(out_batch, torch.zeros_like(out_batch))
             loss.backward()
             optim.step()
 
             print(f'Batch {i}: loss = {loss.item():.06f}')
 
+        model.train(False)
+        losses = []
+        for i in range(100):
+            sources, solutions = gen(1)
+            source_disc = torch.stack([source(grid) for source in sources])  # (B, H, W, 1)
+            sol_disc = torch.stack([sol(grid) for sol in solutions])  # (B, H, W, 1)
+            pred = model(u=source_disc, x_out=grid[None])
+            loss = loss_fn(pred, sol_disc) / loss_fn(sol_disc, torch.zeros_like(sol_disc))
+            losses.append(loss.item())
+        losses = torch.tensor(losses)
+
+        print('Average loss:', losses.mean().item())
+        print('Standard deviation:', losses.std().item())
+
         source, solution = gen(1)
         solution_pred = ol.GridFunction(
-            model(source[0](grid)[None])[0].detach(), x=grid,
+            model(u=source[0](grid)[None], x_out=grid[None])[0].detach(),
+            x=grid,
             interpolator=ol.GridInterpolator(extend='periodic'),
             x_min=gen.a, x_max=gen.b
         )

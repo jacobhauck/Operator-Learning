@@ -1,4 +1,8 @@
+import os
+import shutil
+
 import torch
+import torch.utils.data
 import operatorlearning as ol
 
 
@@ -43,6 +47,59 @@ class FourierSineFunction(ol.Function):
 
     def _evaluate(self, x):
         return _evaluate_fourier_sine(x, self.origin, self.frequencies, self.amplitudes)
+
+    @staticmethod
+    def load(file):
+        state_dict = torch.load(file)
+        return FourierSineFunction(
+            x=state_dict['x'],
+            origin=state_dict['origin'],
+            frequencies=state_dict['frequencies'],
+            amplitudes=state_dict['amplitudes']
+        )
+
+
+class PoissonDataset(torch.utils.data.Dataset):
+    def __init__(self, sources, solutions):
+        super().__init__()
+        self.sources = sources
+        self.solutions = solutions
+
+    def __len__(self):
+        return len(self.sources)
+
+    def __getitem__(self, item):
+        if item >= len(self):
+            raise IndexError
+
+        return self.sources[item], self.solutions[item]
+
+    @staticmethod
+    def load(folder):
+        files = os.listdir(folder)
+        sources, solutions = [], []
+        for file in files:
+            if file.startswith('source'):
+                sample_id = os.path.splitext(file)[0][len('source'):]
+                source_file = os.path.join(folder, file)
+                solution_file = os.path.join(folder, 'solution' + sample_id + '.pth')
+                sources.append(FourierSineFunction.load(source_file))
+                solutions.append(FourierSineFunction.load(solution_file))
+
+        return PoissonDataset(sources, solutions)
+
+    def save(self, folder):
+        try:
+            shutil.rmtree(folder)
+        except FileNotFoundError:
+            pass
+        os.makedirs(folder, exist_ok=True)
+
+        for i, (source, solution) in enumerate(self):
+            source_file = os.path.join(folder, 'source' + str(i) + '.pth')
+            solution_file = os.path.join(folder, 'solution' + str(i) + '.pth')
+            torch.save(source.state_dict(), source_file)
+            torch.save(solution.state_dict(), solution_file)
 
 
 class PoissonDataGenerator(torch.nn.Module):

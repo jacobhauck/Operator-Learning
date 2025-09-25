@@ -10,13 +10,11 @@ import modules
 
 
 class DeepONet(torch.nn.Module):
-    def __init__(self, x, branch_config, trunk_config, scale=None, bias=None):
+    def __init__(self, branch_config, trunk_config, scale=None, bias=None):
         """
         Implementation of a DeepONet with unspecified branch and trunk
         architecture.
 
-        :param x: (*in_shape, u_d_in) sensor points. u_d_in is the dimension of the domain
-            of the input function u, and in_shape is an arbitrary shape.
         :param branch_config: (B, *in_shape, u_d_out) -> (B, p) module implementing the
             branch network. u_d_out is the number of components of u. Provide
             config for construction via modules.create_module().
@@ -33,7 +31,6 @@ class DeepONet(torch.nn.Module):
             normal distribution).
         """
         super(DeepONet, self).__init__()
-        self.register_buffer('x', x)
         self.branch_net = modules.create_module(branch_config)
         self.trunk_net = modules.create_module(trunk_config)
         self.scale = scale

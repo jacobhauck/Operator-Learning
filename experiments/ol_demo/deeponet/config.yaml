@@ -1,0 +1,39 @@
+model:
+  name: deeponet.DeepONet
+  branch_config:
+    name: deeponet.MLPBranchNet
+    num_sensors: 1024
+    num_branches: 32
+    mlp_config:
+      hidden_layers:
+        - 256
+        - 128
+        - 64
+      activation:
+        name: ReLU
+  trunk_config:
+    name: deeponet.MLPTrunkNet
+    num_branches: 32
+    v_d_in: 2
+    v_d_out: 1
+    mlp_config:
+      hidden_layers:
+        - 64
+        - 128
+        - 128
+      activation:
+        name: Tanh
+    feat_expansion:
+      name: deeponet.FourierFeatureExpansion
+      origin: [0, 0]
+      scale: [1, 1]
+      mode: random
+      features: 64
+      learnable: true
+  scale: sqrt
+  bias: true
+
+training:
+  lr: 0.001
+  iterations: 20000
+  batch_size: 1
