@@ -48,6 +48,41 @@ class DeepONet(torch.nn.Module):
     def _init_bias(self):
         torch.nn.init.normal_(self.bias)
 
+    def scale(self, pre_scaled, num_branches):
+        """
+        :param pre_scaled: Pre-scaled output (B, *out_shape, v_d_out)
+        :param num_branches: Number of branch outputs
+        """
+        if self.scale is None:
+            return pre_scaled
+        elif self.scale == 'linear':
+            return pre_scaled / num_branches
+        elif self.scale == 'sqrt':
+            return pre_scaled / (num_branches ** .5)
+        else:
+            return pre_scaled * self.scale
+
+    def add_bias(self, scaled, x_out=None):
+        """
+        :param scaled: Pre-bias scaled output (B, *out_shape, v_d_out)
+        :param x_out: Optional coordinates of output sampling points (only
+            needed if using functional bias)
+        """
+        if self.bias is None:
+            return scaled
+        elif self._bias_is_module:
+            assert x_out is not None
+
+            # noinspection PyCallingNonCallable
+            return scaled + self.bias(x_out)
+        else:
+            if self._need_init:
+                self.bias = torch.nn.Parameter(torch.empty(size=scaled.shape[-1]))
+                self._init_bias()
+                self._need_init = False
+
+            return scaled + self.bias.view(*([1] * (len(scaled.shape)-1)), -1)
+
     def forward(self, u, x_out):
         """
         :param u: (B, *in_shape, u_d_out) sample values of a batch of input
@@ -60,24 +95,8 @@ class DeepONet(torch.nn.Module):
         trunk_vals = self.trunk_net(x_out)  # (B, *out_shape, p, v_d_out)
 
         pre_scaled = torch.einsum('bp,b...po->b...o', branch_vals, trunk_vals)
-        if self.scale is None:
-            scaled = pre_scaled
-        elif self.scale == 'linear':
-            scaled = pre_scaled / branch_vals.shape[1]
-        elif self.scale == 'sqrt':
-            scaled = pre_scaled / (branch_vals.shape[1] ** .5)
-        else:
-            scaled = pre_scaled * self.scale
+        # (B, *out_shape, v_d_out)
 
-        if self.bias is None:
-            return scaled
-        elif self._bias_is_module:
-            # noinspection PyCallingNonCallable
-            return scaled + self.bias(x_out)
-        else:
-            if self._need_init:
-                self.bias = torch.nn.Parameter(torch.empty(size=trunk_vals.shape[-1]))
-                self._init_bias()
-                self._need_init = False
+        scaled = self.scale(pre_scaled, branch_vals.shape[1])
 
-            return scaled + self.bias.view(*([1] * (len(scaled.shape)-1)), -1)
+        return self.add_bias(scaled, x_out)

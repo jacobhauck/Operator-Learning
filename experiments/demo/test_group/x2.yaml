@@ -1,7 +1,0 @@
-nested:
-  nest3:
-    sub_nest:
-      x: 2
-
-other:
-  code: 2

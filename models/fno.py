@@ -31,7 +31,7 @@ class FNO(torch.nn.Module):
             is the model latent dimension provided in fourier_layer_config.
         :param num_fourier_layers: How many Fourier layers the model uses
         :param d_model: Output dimension of hidden functions
-        :param fourier_layer_config: Config for FourierLayer1d, used for each
+        :param fourier_layer_config: Config for FourierLayer, used for each
             layer
         :param project_config: Config for the projection module, which should
             map (B, *shape, d_latent) -> (B, *shape, v_d_out), where d_latent
