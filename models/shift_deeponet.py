@@ -1,4 +1,7 @@
-import torch.nn
+"""
+Implementation of Shift-DeepONet
+"""
+import torch
 
 import models
 import modules.shift_deeponet
