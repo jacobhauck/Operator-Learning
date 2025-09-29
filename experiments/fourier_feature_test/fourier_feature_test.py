@@ -1,12 +1,12 @@
-import experiments
-import modules.deeponet
+import mlx
+import operatorlearning.modules.deeponet
 import torch
 import matplotlib.pyplot as plt
 
 
-class FourierFeatureTestExperiment(experiments.Experiment):
+class FourierFeatureTestExperiment(mlx.Experiment):
     def run(self, config, name, group=None):
-        expansion1d = modules.deeponet.FourierFeatureExpansion(
+        expansion1d = operatorlearning.modules.deeponet.FourierFeatureExpansion(
             origin=config['origin_1d'],
             scale=config['scale_1d'],
             features=config['features_1d'],
@@ -24,7 +24,7 @@ class FourierFeatureTestExperiment(experiments.Experiment):
             plt.plot(x, features[:, i])
         plt.show()
 
-        expansion1d_rand = modules.deeponet.FourierFeatureExpansion(
+        expansion1d_rand = operatorlearning.modules.deeponet.FourierFeatureExpansion(
             origin=config['origin_1d'],
             scale=config['scale_1d'],
             features=config['features_rand_1d'],
@@ -37,7 +37,7 @@ class FourierFeatureTestExperiment(experiments.Experiment):
         plt.show()
 
         x = torch.stack(torch.meshgrid(x, x, indexing='ij'), dim=-1)
-        expansion2d = modules.deeponet.FourierFeatureExpansion(
+        expansion2d = operatorlearning.modules.deeponet.FourierFeatureExpansion(
             origin=config['origin_2d'],
             scale=config['scale_2d'],
             features=config['features_2d'],
@@ -56,7 +56,7 @@ class FourierFeatureTestExperiment(experiments.Experiment):
                     i += 1
         plt.show()
 
-        expansion2d_rand = modules.deeponet.FourierFeatureExpansion(
+        expansion2d_rand = operatorlearning.modules.deeponet.FourierFeatureExpansion(
             origin=config['origin_2d'],
             scale=config['scale_2d'],
             features=config['features_rand_2d'],

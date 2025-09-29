@@ -1,7 +1,7 @@
 model:
-  name: deeponet.DeepONet
+  name: operatorlearning.modules.deeponet.DeepONet
   branch_config:
-    name: deeponet.MLPBranchNet
+    name: operatorlearning.modules.deeponet.MLPBranchNet
     num_sensors: 1024
     num_branches: 32
     mlp_config:
@@ -12,7 +12,7 @@ model:
       activation:
         name: ReLU
   trunk_config:
-    name: deeponet.MLPTrunkNet
+    name: operatorlearning.modules.deeponet.MLPTrunkNet
     num_branches: 32
     v_d_in: 2
     v_d_out: 1
@@ -24,7 +24,7 @@ model:
       activation:
         name: Tanh
     feat_expansion:
-      name: deeponet.FourierFeatureExpansion
+      name: operatorlearning.modules.deeponet.FourierFeatureExpansion
       origin: [0, 0]
       scale: [1, 1]
       mode: random

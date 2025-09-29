@@ -1,5 +1,5 @@
 model:
-  name: fno.FNO
+  name: operatorlearning.modules.fno.FNO
   d_model: 16
 
   lift_config:

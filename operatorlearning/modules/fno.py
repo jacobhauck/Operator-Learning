@@ -1,5 +1,5 @@
 """
-Supporting modules for Fourier Neural Operator (see models.fno.base).
+Implementation of Fourier Neural Operator.
 
 See:
     [1] Li, Z. et al. "Fourier Neural Operator for Parametric Partial Differential
@@ -9,18 +9,74 @@ See:
            Tensorized Fourier Neural Operator for High-Resolution PDEs" (2024).
            TMLR 2024, https://openreview.net/pdf?id=AWiDlO63bH.
 
-Adapted from https://github.com/neuraloperator/ and subject to the license
-found in FNO_LICENSE.
+Adapted from https://github.com/neuraloperator/.
 """
 from typing import Mapping
 
+import mlx
 import torch
 from torch import nn
 
-import modules
-import utils
-
 SYMBOLS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+
+class FNO(torch.nn.Module):
+    def __init__(
+            self,
+            lift_config: Mapping,
+            num_fourier_layers: int,
+            d_model: int,
+            fourier_layer_config: Mapping,
+            project_config: Mapping,
+    ):
+        """
+        A 1D FNO
+        :param lift_config: Config for the lifting module, which should map
+            (B, *shape, u_d_out) -> (B, *shape, d_latent), where d_latent
+            is the model latent dimension provided in fourier_layer_config.
+        :param num_fourier_layers: How many Fourier layers the model uses
+        :param d_model: Output dimension of hidden functions
+        :param fourier_layer_config: Config for FourierLayer, used for each
+            layer
+        :param project_config: Config for the projection module, which should
+            map (B, *shape, d_latent) -> (B, *shape, v_d_out), where d_latent
+            is the model latent dimension provided in fourier_layer_config.
+        """
+        super(FNO, self).__init__()
+
+        layer_config = dict(fourier_layer_config)
+        layer_config['name'] = f'operatorlearning.modules.fno.FourierLayer'
+        conv_config = dict(layer_config['conv_config'])
+        conv_config['in_channels'] = d_model
+        conv_config['out_channels'] = d_model
+        layer_config['conv_config'] = conv_config
+        self.layers = torch.nn.Sequential(*[
+            mlx.create_module(layer_config)
+            for _ in range(num_fourier_layers - 1)
+        ])
+
+        layer_config['is_last'] = True  # The last layer is treated separately
+        self.layers.append(mlx.create_module(layer_config))
+
+        lift_config = dict(lift_config)
+        self.lift = mlx.create_module(lift_config)
+
+        project_config = dict(project_config)
+        self.project = mlx.create_module(project_config)
+
+    def forward(self, u):
+        """
+        :param u: (B, *shape, u_d_out) input function sampled uniformly on the
+            domain
+        :return: (B, *shape, v_d_out) output function sampled uniformly on the
+            domain
+        """
+
+        v = self.lift(u).transpose(1, -1)  # (B, C, *shape)
+        v = self.layers(v)  # (B, C, *shape)
+        v = self.project(v.transpose(1, -1))  # (B, *shape, v_d_out)
+
+        return v
 
 
 def _contract_dense(x, weight):
@@ -180,7 +236,7 @@ class ChannelMLP(torch.nn.Module):
     def __init__(self, mlp_config):
         """MLP applied along channel dimension"""
         super(ChannelMLP, self).__init__()
-        self.mlp = modules.MLP(**mlp_config)
+        self.mlp = mlx.modules.MLP(**mlp_config)
 
     def forward(self, x):
         """
@@ -226,7 +282,7 @@ class FourierLayer(torch.nn.Module):
         self._mlp_norm = None
 
         if not is_last:
-            self._nonlinearity = utils.create_activation(nonlinearity)
+            self._nonlinearity = mlx.create_module(nonlinearity)
 
         if self.use_mlp:
             self._mlp_skip = ChannelMLP(dict(
@@ -242,9 +298,9 @@ class FourierLayer(torch.nn.Module):
             self._mlp = ChannelMLP(mlp_config)
 
         if norm_config is not None:
-            self._norm = modules.create_module(norm_config)
+            self._norm = mlx.create_module(norm_config)
             if self.use_mlp:
-                self._mlp_norm = modules.create_module(norm_config)
+                self._mlp_norm = mlx.create_module(norm_config)
 
     def forward(self, x):
         if self.use_preactivation:

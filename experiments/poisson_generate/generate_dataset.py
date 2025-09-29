@@ -1,15 +1,15 @@
 import torch
 
-import data.synthetic.poisson
-import experiments
+import operatorlearning.data.synthetic.poisson as poisson
+import mlx
 
 
-class PoissonGenerateExperiment(experiments.Experiment):
+class PoissonGenerateExperiment(mlx.Experiment):
     def run(self, config, name, group=None):
-        source_gen = data.synthetic.poisson.DenseSourceGenerator(
+        source_gen = poisson.DenseSourceGenerator(
             config['n_modes'], lambda k: 3/(1.0 + (k**2).sum(dim=-1, keepdim=True))
         )
-        gen = data.synthetic.poisson.PoissonDataGenerator(
+        gen = poisson.PoissonDataGenerator(
             torch.tensor(config['x_min']),
             torch.tensor(config['x_max']),
             source_gen
@@ -26,5 +26,5 @@ class PoissonGenerateExperiment(experiments.Experiment):
             solutions.extend(batch_solutions)
             batch_start += config['batch_size']
 
-        dataset = data.synthetic.poisson.PoissonDataset(sources, solutions)
+        dataset = poisson.PoissonDataset(sources, solutions)
         dataset.save(config['output_folder'])

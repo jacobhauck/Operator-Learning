@@ -8,7 +8,7 @@ import numpy as np
 import pandas
 import torch.utils.data
 
-import data.external.utils as utils
+from operatorlearning import data as utils
 import operatorlearning as ol
 
 

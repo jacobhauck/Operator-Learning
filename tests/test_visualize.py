@@ -1,4 +1,4 @@
-import data.external.cfdbench as cdb
+import operatorlearning.data.external.cfdbench as cdb
 
 d = cdb.CFDBenchDataset('cylinder-prop')
 state, metadata = d[5]
