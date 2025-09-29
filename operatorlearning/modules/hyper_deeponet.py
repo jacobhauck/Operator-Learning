@@ -92,7 +92,7 @@ class MainMLP(torch.nn.Module):
         layers.pop()  # Remove the last activation function
 
         # Save layers as ModuleList
-        self.layers = torch.nn.ModuleList(*layers)
+        self.layers = torch.nn.ModuleList(layers)
 
         # Logic for routing hyperparameters
         self.offsets = [0]
@@ -130,7 +130,7 @@ class MainMLP(torch.nn.Module):
             except AttributeError:
                 pass
 
-            x = self.layer(x, **layer_params)
+            x = layer(x, **layer_params)
 
         return x
 
@@ -146,7 +146,11 @@ class MainMLPTrunk(torch.nn.Module):
         mlp_config['d_in'] = v_d_in
         mlp_config['d_out'] = v_d_out
         self.main_mlp = MainMLP(**mlp_config)
-
+    
+    @property
+    def num_params(self):
+        return self.main_mlp.num_params
+    
     def forward(self, x, params):
         """
         :param x: (B, *out_shape, v_d_in) Coordinates of points at which to evaluate
@@ -154,7 +158,7 @@ class MainMLPTrunk(torch.nn.Module):
         :param params: (B, num_params) Parameters of the main network
         :return: (B, *out_shape, v_d_out)
         """
-        self.main_mlp(x, params)
+        return self.main_mlp(x, params)
 
 
 class HypernetworkMLP(torch.nn.Module):
@@ -168,10 +172,9 @@ class HypernetworkMLP(torch.nn.Module):
             inferred automatically from num_sensors and num_params.
         """
         super().__init__()
-        mlp_config['name'] = 'MLP'
         mlp_config['d_in'] = num_sensors
         mlp_config['d_out'] = num_params
-        self.mlp = mlx.create_module(mlp_config)
+        self.mlp = mlx.modules.MLP(**mlp_config)
 
     def forward(self, u):
         """
