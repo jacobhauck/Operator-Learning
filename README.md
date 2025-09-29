@@ -4,8 +4,18 @@ This repository contains simple, unified implementations of popular
 operator learning models, such as
 
 - DeepONet
+- Shift-DeepONet
+- HyperDeepONet
 - Fourier Neural Operator (FNO)
 - More in the future!
+
+## Installing
+Clone this repository and install with
+```commandline
+pip install .
+```
+This repository also requires PyTorch and `mlx`, my machine learning utiility
+library, which can be found [here](https://github.com/jacobhauck/ML-Template).
 
 ## What is Operator Learning?
 
