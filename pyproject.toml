@@ -1,0 +1,43 @@
+[build-system]
+requires = [
+    "setuptools",
+    "wheel",
+    "toml",
+    "versioningit"
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "operatorlearning"
+authors = [
+    {name = "Jacob Hauck", email = "jacobh15@yahoo.com"}
+]
+description = "Operator learning toolkit"
+readme = "README.md"
+license = "MIT"
+classifiers = [
+    "Programming Language :: Python :: 3"
+]
+dynamic = ["version", "dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.versioningit.vcs]
+method = "git"
+match = ["v*"]
+default-tag = "0.0.1"
+
+[tool.versioningit.next-version]
+method = "minor"
+
+[tool.versioningit.format]
+distance = "{next_version}"
+dirty = "{next_version}"
+distance-dirty = "{next_version}"
+
+[tool.versioningit.write]
+file = "operatorlearning/_version.py"
+
+[tool.setuptools.packages.find]
+exclude = ["experiments*"]

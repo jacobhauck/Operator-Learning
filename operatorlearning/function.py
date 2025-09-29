@@ -137,7 +137,9 @@ class Function(torch.nn.Module):
                 else:
                     x_max = float(self.x.max())
 
-            x_query = GridFunction.uniform_x(x_min, x_max, resolution[0])
+            x_query = GridFunction.uniform_x(
+                torch.tensor([x_min]), torch.tensor([x_max]), resolution[0]
+            )
             y_query = self(x_query)
             if self.is_scalar:
                 y_query = y_query[..., 0]
