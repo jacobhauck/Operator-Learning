@@ -141,8 +141,9 @@ class SpectralConv(torch.nn.Module):
             init_std = init_std
 
         weight_shape = (in_channels, out_channels, *max_n_modes)
-        self.weight = torch.empty(weight_shape, dtype=torch.cfloat)
-        self.weight.normal_(0, init_std)
+        weight = torch.empty(weight_shape, dtype=torch.cfloat)
+        weight.normal_(0, init_std)
+        self.weight = nn.Parameter(weight)
 
         if bias:
             self.bias = nn.Parameter(
