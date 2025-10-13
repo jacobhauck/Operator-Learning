@@ -109,7 +109,7 @@ class Function(torch.nn.Module):
 
         return self.interpolator.interpolate(self, x_query)
 
-    def quick_visualize(self, x_min=None, x_max=None, resolution: int | Sequence[int] = 300):
+    def quick_visualize(self, x_min=None, x_max=None, resolution: int | Sequence[int] = 300, show: bool = True):
         import matplotlib.pyplot as plt
         import numpy as np
 
@@ -123,7 +123,7 @@ class Function(torch.nn.Module):
 
         n_rows = max(1, int(self.d_out**.5 / 2))
         n_cols = (self.d_out + n_rows - 1) // n_rows
-        fig, axes = plt.subplots(n_rows, n_cols)
+        fig, axes = plt.subplots(n_rows, n_cols, squeeze=False)
 
         if self.d_in == 1:
             if x_min is None:
@@ -145,30 +145,15 @@ class Function(torch.nn.Module):
                 y_query = y_query[..., 0]
 
             i = 0
-            if n_rows > 1 and n_cols > 1:
-                for row in axes:
-                    for ax in row:
-                        ax.plot(x_query, y_query[..., i])
-                        if self.out_components is not None:
-                            ax.set_title(self.out_components[i])
-                        if self.in_components is not None:
-                            ax.set_xlabel(self.in_components[0])
-                        i += 1
-            elif n_rows > 1 or n_cols > 1:
-                for ax in axes:
+            for row in axes:
+                for ax in row:
                     ax.plot(x_query, y_query[..., i])
                     if self.out_components is not None:
                         ax.set_title(self.out_components[i])
                     if self.in_components is not None:
                         ax.set_xlabel(self.in_components[0])
                     i += 1
-            else:
-                axes.plot(x_query, y_query[..., 0])
-                if self.out_components is not None:
-                    axes.set_title(self.out_components[0])
-                if self.in_components is not None:
-                    axes.set_xlabel(self.in_components[0])
-
+        
         elif self.d_in == 2:
             if x_min is None:
                 if hasattr(self, 'x_min'):
@@ -194,18 +179,8 @@ class Function(torch.nn.Module):
                 y_query = y_query[..., None]
 
             i = 0
-            if n_rows > 1 and n_cols > 1:
-                for row in axes:
-                    for ax in row:
-                        ax.imshow(y_query[..., i], origin='lower', extent=extent)
-                        if self.out_components is not None:
-                            ax.set_title(self.out_components[i])
-                        if self.in_components is not None:
-                            ax.set_xlabel(self.in_components[1])
-                            ax.set_ylabel(self.in_components[0])
-                        i += 1
-            elif n_rows > 1 or n_cols > 1:
-                for ax in axes:
+            for row in axes:
+                for ax in row:
                     ax.imshow(y_query[..., i], origin='lower', extent=extent)
                     if self.out_components is not None:
                         ax.set_title(self.out_components[i])
@@ -213,18 +188,18 @@ class Function(torch.nn.Module):
                         ax.set_xlabel(self.in_components[1])
                         ax.set_ylabel(self.in_components[0])
                     i += 1
-            else:
-                axes.imshow(y_query[..., i], origin='lower', extent=extent)
-                if self.out_components is not None:
-                    axes.set_title(self.out_components[0])
-                if self.in_components is not None:
-                    axes.set_xlabel(self.in_components[1])
-                    axes.set_ylabel(self.in_components[0])
+            
         else:
             raise ValueError('Visualization not supported for input dimension other than 1 or 2.')
-
-        plt.show()
-        fig.savefig('last_visualization.pdf')
+        
+        if show:
+            plt.show()
+            fig.savefig('last_visualization.pdf')
+        else:
+            axes = axes.squeeze()
+            if len(axes.shape) == 0:
+                axes = axes.item()
+            return fig, axes
 
 
 def _grid_interpolate(function: 'GridFunction', x, method, extend):
