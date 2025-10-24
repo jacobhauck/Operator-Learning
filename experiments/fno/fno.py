@@ -14,7 +14,7 @@ class FNODemoExperiment(mlx.Experiment):
         )
         gen = poisson.PoissonDataGenerator(
             torch.tensor([0.0, 0.0]),
-            torch.tensor([1.0, 1.0]),
+            torch.tensor([10.0, 10.0]),
             source_gen
         )
         loss_fn = torch.nn.MSELoss()

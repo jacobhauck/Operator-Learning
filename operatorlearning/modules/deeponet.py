@@ -3,6 +3,32 @@ Implementation of DeepONet
 """
 import mlx
 import torch
+import operatorlearning as ol
+
+
+class DeepONetOutputFunction(ol.Function):
+    @staticmethod
+    def _evaluate(deeponet, x, branch_vals):
+        trunk_vals = deeponet.trunk_net(x)
+        pre_scaled = torch.einsum('p,...po->...o', branch_vals, trunk_vals)
+        # (*out_shape, v_d_out)
+
+        scaled = deeponet.scale_output(pre_scaled, branch_vals.shape[0])
+
+        return deeponet.add_bias(scaled, x)
+
+    def __init__(self, deeponet, x, branch_vals):
+        self.deeponet = deeponet
+        branch_vals = branch_vals.detach().clone()
+        super().__init__(
+            DeepONetOutputFunction._evaluate(deeponet, x, branch_vals),
+            x,
+            ol.OracleInterpolator(self.oracle)
+        )
+        self.register_buffer('branch_vals', branch_vals)
+
+    def oracle(self, x):
+        return DeepONetOutputFunction._evaluate(self.deeponet, x, self.branch_vals)
 
 
 class DeepONet(torch.nn.Module):
@@ -79,15 +105,25 @@ class DeepONet(torch.nn.Module):
 
             return scaled + self.bias.view(*([1] * (len(scaled.shape)-1)), -1)
 
-    def forward(self, u, x_out):
+    def forward(self, u, x_out, return_functions=False):
         """
         :param u: (B, *in_shape, u_d_out) sample values of a batch of input
             functions
         :param x_out: (B, *out_shape, v_d_in) coordinates of points at which
             to sample the output function.
+        :param return_functions: Whether the output should be returned as
+            a list of Functions. Note that this detaches branch values, so
+            this should not be used for training.
         :return: (B, *out_shape, v_d_out)
         """
         branch_vals = self.branch_net(u)  # (B, p)
+
+        if return_functions:
+            return [
+                DeepONetOutputFunction(self, x_out[b], branch_vals[b])
+                for b in range(len(x_out))
+            ]
+
         trunk_vals = self.trunk_net(x_out)  # (B, *out_shape, p, v_d_out)
 
         pre_scaled = torch.einsum('bp,b...po->b...o', branch_vals, trunk_vals)

@@ -1,0 +1,48 @@
+model:
+  name: operatorlearning.modules.two_step_deeponet.TwoStepDeepONet
+  num_branches: &num_branches 64
+  deeponet:
+    name: operatorlearning.modules.deeponet.DeepONet
+    branch_config:
+      name: operatorlearning.modules.deeponet.MLPBranchNet
+      num_sensors: 1024
+      num_branches: *num_branches
+      mlp_config:
+        hidden_layers:
+          - 512
+          - 256
+          - 128
+        activation:
+          name: ReLU
+    trunk_config:
+      name: operatorlearning.modules.deeponet.MLPTrunkNet
+      num_branches: *num_branches
+      v_d_in: 2
+      v_d_out: 1
+      mlp_config:
+        hidden_layers:
+          - 128
+          - 128
+          - 128
+        activation:
+          name: Tanh
+      feat_expansion:
+        name: operatorlearning.modules.deeponet.FourierFeatureExpansion
+        origin: [0, 0]
+        scale: [10, 10]
+        mode: full
+        features: 6
+        learnable: false
+    bias: true
+
+training:
+  dataset_size: 1024
+  batch_size: 16
+  step_1:
+    lr: 0.001
+    epochs: 200
+  step_2:
+    lr: 0.001
+    epochs: 200
+
+device: cuda

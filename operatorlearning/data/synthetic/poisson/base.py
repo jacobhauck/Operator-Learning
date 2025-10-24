@@ -64,6 +64,7 @@ class PoissonDataset(torch.utils.data.Dataset):
         super().__init__()
         self.sources = sources
         self.solutions = solutions
+        self.x = None
 
     def __len__(self):
         return len(self.sources)
@@ -72,7 +73,10 @@ class PoissonDataset(torch.utils.data.Dataset):
         if item >= len(self):
             raise IndexError
 
-        return self.sources[item], self.solutions[item]
+        if self.x is None:
+            return self.sources[item], self.solutions[item]
+        else:
+            return self.sources[item](self.x), self.solutions[item](self.x)
 
     @staticmethod
     def load(folder):

@@ -14,10 +14,10 @@ class GNOTExperiment(mlx.Experiment):
         )
         gen = poisson.PoissonDataGenerator(
             torch.tensor([0.0, 0.0]),
-            torch.tensor([1.0, 1.0]),
+            torch.tensor([10.0, 10.0]),
             source_gen
         )
-        loss_fn = torch.nn.MSELoss()
+        loss_fn = mlx.modules.RelativeL2Loss()
 
         grid = ol.GridFunction.uniform_x(gen.a, gen.b, num=128)[:-1, :-1]
         grid_batch = torch.tile(
@@ -32,7 +32,7 @@ class GNOTExperiment(mlx.Experiment):
 
             optim.zero_grad()
             pred_batch = model([(in_batch, grid_batch)], grid_batch)
-            loss = loss_fn(pred_batch, out_batch) / loss_fn(out_batch, torch.zeros_like(out_batch))
+            loss = loss_fn(pred_batch, out_batch)
             loss.backward()
             optim.step()
 
@@ -45,7 +45,7 @@ class GNOTExperiment(mlx.Experiment):
             source_disc = torch.stack([source(grid) for source in sources])  # (B, H, W, 1)
             sol_disc = torch.stack([sol(grid) for sol in solutions])  # (B, H, W, 1)
             pred = model(source_disc)
-            loss = loss_fn(pred, sol_disc) / loss_fn(sol_disc, torch.zeros_like(sol_disc))
+            loss = loss_fn(pred, sol_disc)
             losses.append(loss.item())
         losses = torch.tensor(losses)
 
