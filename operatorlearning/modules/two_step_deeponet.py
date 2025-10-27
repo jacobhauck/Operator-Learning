@@ -32,10 +32,7 @@ class TwoStepDeepONet(torch.nn.Module):
         pre_bias = torch.einsum('b...pd,bp', trunk, branch_proj)
         # (B, *out_shape, v_d_out)
 
-        bias = branch[:, -1].view(-1, *((1,) * len(pre_bias.shape[1:])))
-        # (B, 1, ..., 1)
-
-        return pre_bias + bias
+        return self.deeponet.add_bias(pre_bias)
 
     def step_one(self, a, x_out):
         """
