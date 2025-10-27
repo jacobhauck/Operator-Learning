@@ -2,13 +2,11 @@ import mlx
 import torch
 import operatorlearning.data.synthetic.poisson as poisson
 import operatorlearning as ol
+from operatorlearning.modules import pcanet
 
 
-class FNODemoExperiment(mlx.Experiment):
+class PCANetDemoExperiment(mlx.Experiment):
     def run(self, config, name, group=None):
-        model = mlx.create_model(config['model'])
-        optim = torch.optim.Adam(model.parameters(), lr=config['training']['lr'])
-
         source_gen = poisson.DenseSourceGenerator(
             [6, 6], lambda k: 3/(1.0 + k[:, 0:1]**2 + k[:, 1:2]**2)
         )
@@ -17,9 +15,21 @@ class FNODemoExperiment(mlx.Experiment):
             torch.tensor([10.0, 10.0]),
             source_gen
         )
-        loss_fn = mlx.moduls.RelativeL2Loss()
+        loss_fn = mlx.modules.RelativeL2Loss()
 
         grid = ol.GridFunction.uniform_x(gen.a, gen.b, num=128)[:-1, :-1]
+
+        source_dataset = []
+        solution_dataset = []
+        for i in range(config['training']['dataset_size']):
+            source, solution = gen(1)
+            source_dataset.append(source[0])
+            solution_dataset.append(solution[0])
+
+        u_mean, u_basis = pcanet.pca_basis(source_dataset, grid, config['u_num_modes'])
+        v_mean, v_basis = pcanet.pca_basis(solution_dataset, grid, config['v_num_modes'])
+        model = pcanet.PCANet(u_mean, u_basis, v_mean, v_basis, config['approximator'])
+        optim = torch.optim.Adam(model.parameters(), lr=config['training']['lr'])
 
         for i in range(config['training']['iterations']):
             sources, solutions = gen(config['training']['batch_size'])
