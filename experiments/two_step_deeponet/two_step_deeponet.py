@@ -6,7 +6,7 @@ import operatorlearning.data.synthetic.poisson as poisson
 import operatorlearning as ol
 
 
-class DeepONetDemoExperiment(mlx.Experiment):
+class TwoStepDeepONetDemoExperiment(mlx.Experiment):
     def run(self, config, name, group=None):
         model = mlx.create_model(config['model'])
         model.to(config['device'])
