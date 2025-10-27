@@ -86,8 +86,8 @@ class TwoStepDeepONetDemoExperiment(mlx.Experiment):
         losses = []
         for i in range(100):
             sources, solutions = gen(1)
-            source_disc = torch.stack([source(grid) for source in sources])  # (B, H, W, 1)
-            sol_disc = torch.stack([sol(grid) for sol in solutions])  # (B, H, W, 1)
+            source_disc = torch.stack([source(grid) for source in sources])  # (1, H, W, 1)
+            sol_disc = torch.stack([sol(grid) for sol in solutions])  # (1, H, W, 1)
             pred = model(u=source_disc, x_out=grid[None])
             loss = loss_fn(pred, sol_disc) / loss_fn(sol_disc, torch.zeros_like(sol_disc))
             losses.append(loss.item())
@@ -98,11 +98,11 @@ class TwoStepDeepONetDemoExperiment(mlx.Experiment):
 
         source, solution = gen(1)
         solution_pred = ol.GridFunction(
-            model(u=source[0](grid)[None], x_out=grid[None])[0].detach(),
-            x=grid[None],
+            model(u=source[0](grid)[None], x_out=grid[None])[0].detach().cpu(),
+            x=grid.cpu(),
             interpolator=ol.GridInterpolator(extend='periodic'),
-            x_min=gen.a, x_max=gen.b
+            x_min=gen.a.cpu(), x_max=gen.b.cpu()
         )
-        source[0].quick_visualize()
-        solution[0].quick_visualize()
-        solution_pred.quick_visualize()
+        source[0].cpu().quick_visualize()
+        solution[0].cpu().quick_visualize()
+        solution_pred.cpu().quick_visualize()

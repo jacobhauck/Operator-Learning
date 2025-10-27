@@ -26,10 +26,10 @@ class TwoStepDeepONet(torch.nn.Module):
         branch = self.deeponet.branch_net(u) # (B, p)
         trunk = self.deeponet.trunk_net(x_out)  # (B, *out_shape, p, v_d_out)
 
-        branch_proj = torch.einsum('qp,bp', self.t_matrix, branch)
+        branch_proj = torch.einsum('qp,bp->bq', self.t_matrix, branch)
         # (B, p)
 
-        pre_bias = torch.einsum('b...pd,bp', trunk, branch_proj)
+        pre_bias = torch.einsum('b...pd,bp->b...d', trunk, branch_proj)
         # (B, *out_shape, v_d_out)
 
         return self.deeponet.add_bias(pre_bias)

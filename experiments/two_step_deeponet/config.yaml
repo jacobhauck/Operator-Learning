@@ -37,12 +37,12 @@ model:
 
 training:
   dataset_size: 1024
-  batch_size: 16
+  batch_size: 128
   step_1:
-    lr: 0.001
+    lr: 0.005
     epochs: 200
   step_2:
-    lr: 0.001
+    lr: 0.005
     epochs: 200
 
 device: cuda
