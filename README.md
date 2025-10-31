@@ -14,7 +14,7 @@ Clone this repository and install with
 ```commandline
 pip install .
 ```
-This repository also requires PyTorch and `mlx`, my machine learning utiility
+This repository also requires PyTorch and `mlx`, my machine learning utility
 library, which can be found [here](https://github.com/jacobhauck/ML-Template).
 
 ## What is Operator Learning?
