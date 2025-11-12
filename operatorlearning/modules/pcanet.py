@@ -55,26 +55,38 @@ def pca_basis(dataset, x, num_modes, mean=None):
 
 
 class PCANet(torch.nn.Module):
-    def __init__(self, u_mean, u_basis, v_mean, v_basis, approximator):
+    def __init__(self, u_num_modes, v_num_modes, approximator):
         """
-        :param u_mean: (*input_shape, u_d_out) mean of the input function
-            distribution
-        :param u_basis: (u_num_modes, *input_shape, u_d_out) Sampled input PCA
-            basis functions (centered at u_mean)
-        :param v_mean: (*output_shape, v_d_out) mean of the output function
-            distribution
-        :param v_basis: (v_num_modes, *input_shape, v_d_out) Sampled output PCA
-            basis functions (centered at v_mean)
+        :param u_num_modes: Number of PCA modes to keep for the input function u
+        :param v_num_modes: Number of PCA modes to keep for the output function v
         :param approximator: Config of approximation module. Should map
             (B, u_num_modes) -> (B, v_num_modes)
         """
         super().__init__()
-        self.u_mean = u_mean
-        self.u_basis = u_basis
-        self.v_mean = v_mean
-        self.v_basis = v_basis
+        self.u_num_modes = u_num_modes
+        self.v_num_modes = v_num_modes
+        self.u_mean = None
+        self.u_basis = None
+        self.v_mean = None
+        self.v_basis = None
         self.approximator = mlx.create_module(approximator)
-
+    
+    def fit_pca(self, dataset, x, y):
+        """
+        Fit the model's PCA bases
+        :param dataset: The dataset to fit to. Should be an iterable whose
+            elements are pairs (u, v) of input and output functions
+        :param x: (*shape, d_in) Points at which to sample input functions
+        :param y: (*shape, d_out) Points at which to sample output functions
+        """
+        u_dataset, v_dataset = [], []
+        for u, v in dataset:
+            u_dataset.append(u)
+            v_dataset.append(v)
+        
+        self.u_mean, self.u_basis = pca_basis(u_dataset, x, self.u_num_modes)
+        self.v_mean, self.v_basis = pca_basis(v_dataset, x, self.v_num_modes)
+    
     def forward(self, u):
         """
         :param u: (B, *input_shape, u_d_out) Input function sampled on the

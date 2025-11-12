@@ -11,19 +11,20 @@ num_samples: 256
 batch_size: 8
 num_pca_modes: 5
 
-u_num_modes: &u_num_modes 16
-v_num_modes: &v_num_modes 16
-
-approximator:
-  name: MLP
-  d_in: *u_num_modes
-  d_out: *v_num_modes
-  hidden_layers:
-    - 128
-    - 128
-    - 128
-  activation:
-    name: ReLU
+model:
+  name: PCANet
+  u_num_modes: &u_num_modes 16
+  v_num_modes: &v_num_modes 16
+  approximator:
+    name: MLP
+    d_in: *u_num_modes
+    d_out: *v_num_modes
+    hidden_layers:
+      - 128
+      - 128
+      - 128
+    activation:
+      name: ReLU
 
 training:
   lr: 0.001

@@ -26,9 +26,8 @@ class PCANetDemoExperiment(mlx.Experiment):
             source_dataset.append(source[0])
             solution_dataset.append(solution[0])
 
-        u_mean, u_basis = pcanet.pca_basis(source_dataset, grid, config['u_num_modes'])
-        v_mean, v_basis = pcanet.pca_basis(solution_dataset, grid, config['v_num_modes'])
-        model = pcanet.PCANet(u_mean, u_basis, v_mean, v_basis, config['approximator'])
+        model = mlx.create_model(config['model'])
+        model.fit_pca(zip(source_dataset, solution_dataset), grid, grid)
         optim = torch.optim.Adam(model.parameters(), lr=config['training']['lr'])
 
         for i in range(config['training']['iterations']):
