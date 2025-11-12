@@ -84,8 +84,12 @@ class PCANet(torch.nn.Module):
             u_dataset.append(u)
             v_dataset.append(v)
         
-        self.u_mean, self.u_basis = pca_basis(u_dataset, x, self.u_num_modes)
-        self.v_mean, self.v_basis = pca_basis(v_dataset, x, self.v_num_modes)
+        u_mean, u_basis = pca_basis(u_dataset, x, self.u_num_modes)
+        v_mean, v_basis = pca_basis(v_dataset, x, self.v_num_modes)
+        self.register_buffer('u_mean', u_mean)
+        self.register_buffer('u_basis', u_basis)
+        self.register_buffer('v_mean', u_mean)
+        self.register_buffer('v_basis', v_basis)
     
     def forward(self, u):
         """
