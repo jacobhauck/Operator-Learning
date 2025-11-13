@@ -76,8 +76,8 @@ class PCANet(torch.nn.Module):
         Fit the model's PCA bases
         :param dataset: The dataset to fit to. Should be an iterable whose
             elements are pairs (u, v) of input and output functions
-        :param x: (*shape, d_in) Points at which to sample input functions
-        :param y: (*shape, d_out) Points at which to sample output functions
+        :param x: (*shape, u_d_in) Points at which to sample input functions
+        :param y: (*shape, v_d_in) Points at which to sample output functions
         """
         u_dataset, v_dataset = [], []
         for u, v in dataset:
@@ -85,7 +85,7 @@ class PCANet(torch.nn.Module):
             v_dataset.append(v)
         
         u_mean, u_basis = pca_basis(u_dataset, x, self.u_num_modes)
-        v_mean, v_basis = pca_basis(v_dataset, x, self.v_num_modes)
+        v_mean, v_basis = pca_basis(v_dataset, y, self.v_num_modes)
         self.register_buffer('u_mean', u_mean)
         self.register_buffer('u_basis', u_basis)
         self.register_buffer('v_mean', u_mean)
