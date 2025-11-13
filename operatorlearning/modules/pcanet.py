@@ -55,16 +55,29 @@ def pca_basis(dataset, x, num_modes, mean=None):
 
 
 class PCANet(torch.nn.Module):
-    def __init__(self, u_num_modes, v_num_modes, approximator):
+    def __init__(
+            self,
+            u_num_modes,
+            u_sample_shape,
+            v_num_modes,
+            v_sample_shape,
+            approximator
+    ):
         """
         :param u_num_modes: Number of PCA modes to keep for the input function u
+        :param u_sample_shape: Shape of sampled input function u (*u_shape, u_d_out)
         :param v_num_modes: Number of PCA modes to keep for the output function v
+        :param v_sample_shape: Shape of sampled output function v (*v_shape, v_d_out)
         :param approximator: Config of approximation module. Should map
             (B, u_num_modes) -> (B, v_num_modes)
         """
         super().__init__()
         self.u_num_modes = u_num_modes
         self.v_num_modes = v_num_modes
+        self.register_buffer('u_mean', torch.empty(u_sample_shape))
+        self.register_buffer('u_basis', torch.empty((u_num_modes, *u_sample_shape)))
+        self.register_buffer('v_mean', torch.empty(v_sample_shape))
+        self.register_buffer('v_basis', torch.empty((v_num_modes, *v_sample_shape)))
         self.approximator = mlx.create_module(approximator)
     
     def fit_pca(self, dataset, x, y):
@@ -82,10 +95,10 @@ class PCANet(torch.nn.Module):
         
         u_mean, u_basis = pca_basis(u_dataset, x, self.u_num_modes)
         v_mean, v_basis = pca_basis(v_dataset, y, self.v_num_modes)
-        self.register_buffer('u_mean', u_mean)
-        self.register_buffer('u_basis', u_basis)
-        self.register_buffer('v_mean', u_mean)
-        self.register_buffer('v_basis', v_basis)
+        self.u_mean[:] = u_mean
+        self.u_basis[:] = u_basis
+        self.v_mean[:] = v_mean
+        self.v_basis[:] = v_basis
     
     def forward(self, u):
         """

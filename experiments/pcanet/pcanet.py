@@ -26,6 +26,8 @@ class PCANetDemoExperiment(mlx.Experiment):
             source_dataset.append(source[0])
             solution_dataset.append(solution[0])
 
+        config['model']['u_sample_shape'] = source_dataset[0](grid).shape
+        config['model']['v_sample_shape'] = solution_dataset[0](grid).shape
         model = mlx.create_model(config['model'])
         model.fit_pca(zip(source_dataset, solution_dataset), grid, grid)
         optim = torch.optim.Adam(model.parameters(), lr=config['training']['lr'])
