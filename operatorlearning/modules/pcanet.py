@@ -65,10 +65,6 @@ class PCANet(torch.nn.Module):
         super().__init__()
         self.u_num_modes = u_num_modes
         self.v_num_modes = v_num_modes
-        self.u_mean = None
-        self.u_basis = None
-        self.v_mean = None
-        self.v_basis = None
         self.approximator = mlx.create_module(approximator)
     
     def fit_pca(self, dataset, x, y):
