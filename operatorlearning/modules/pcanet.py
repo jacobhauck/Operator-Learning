@@ -107,7 +107,19 @@ class PCANet(torch.nn.Module):
         :return: (B, *output_shape, v_d_out) Output function sampled on the
             same points used for the output PCA basis
         """
+        u_proj = self.encoder(u)  # (B, u_num_modes)
 
+        v_proj = self.approximator(u_proj)  # (B, v_num_modes)
+
+        return self.reconstructor(v_proj)  # (B, *output_shape, v_d_out)
+
+    def encoder(self, u):
+        """
+        :param u: (B, *input_shape, u_d_out) Input function sampled on the
+            same points used for the input PCA basis
+        :return: (B, u_num_modes) Projection of input functions onto input
+            PCA basis (action of the encoder)
+        """
         # L^2 projection of u onto u_basis
         u_centered = u - self.u_mean[None]
         # (B, *input_shape, u_d_out)
@@ -116,9 +128,45 @@ class PCANet(torch.nn.Module):
         u_proj = h * torch.einsum('B...d,N...d->BN', u_centered, self.u_basis)
         # (B, u_num_modes)
 
-        v_proj = self.approximator(u_proj)  # (B, v_num_modes)
+        return u_proj
 
+    def decoder(self, u_proj):
+        """
+        :param u_proj: (B, u_num_modes) Projection of input functions onto input
+            PCA basis (action of the encoder)
+        :return: (B, *input_shape, u_d_out) Input function sampled on the
+            same points used for the input PCA basis
+        """
+        u = torch.einsum('BN,N...d->B...d', u_proj, self.u_basis)
+        # (B, *output_shape, u_d_out)
+
+        return u + self.u_mean[None]
+
+    def reconstructor(self, v_proj):
+        """
+        :param v_proj: (B, v_num_modes) Projections of output functions onto the
+            output PCA basis
+        :return: (B, *output_shape, v_d_out) Output function sampled on the
+            same points used for the output PCA basis
+        """
         v = torch.einsum('BN,N...d->B...d', v_proj, self.v_basis)
         # (B, *output_shape, v_d_out)
 
         return v + self.v_mean[None]
+
+    def projector(self, v):
+        """
+        :param v: (B, *output_shape, v_d_out) Output function sampled on the
+            same points used for the output PCA basis
+        :return: (B, v_num_modes) Projections of output functions onto the
+            output PCA basis
+        """
+        # L^2 projection of v onto v_basis
+        v_centered = v - self.v_mean[None]
+        # (B, *input_shape, v_d_out)
+
+        h = 1 / torch.prod(torch.tensor(v_centered.shape[1:-1])).item()
+        v_proj = h * torch.einsum('B...d,N...d->BN', v_centered, self.v_basis)
+        # (B, v_num_modes)
+
+        return v_proj
