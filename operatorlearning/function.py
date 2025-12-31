@@ -402,14 +402,7 @@ class GridFunction(Function):
 
         if x is not None:
             if xs is None:
-                self.xs = []
-                extraction_tuple = [0] * len(x.shape)
-                for i in range(len(x.shape) - 1):
-                    extraction_tuple[i-1] = 0
-                    # noinspection PyTypeChecker
-                    extraction_tuple[i] = slice(None)
-                    extraction_tuple[-1] = i
-                    self.xs.append(x[*extraction_tuple].contiguous())
+                self.xs = self.extract_xs(x)
             else:
                 self.xs = xs
 
@@ -444,6 +437,23 @@ class GridFunction(Function):
             y, x, interpolator,
             in_components=in_components, out_components=out_components
         )
+
+    @staticmethod
+    def extract_xs(x):
+        """
+        :param x: (x_1, ..., x_{d_in}, d_in) tensor of coordinate values.
+            Coordinates must be increasing and form a tensor grid.
+        """
+        xs = []
+        extraction_tuple = [0] * len(x.shape)
+        for i in range(len(x.shape) - 1):
+            extraction_tuple[i-1] = 0
+            # noinspection PyTypeChecker
+            extraction_tuple[i] = slice(None)
+            extraction_tuple[-1] = i
+            xs.append(x[*extraction_tuple].contiguous())
+
+        return xs
 
     def trace(self, index: int, dim: int | str):
         """

@@ -1,0 +1,5 @@
+integrator:
+  name: operatorlearning.modules.mfear.TrapezoidIntegrator
+
+dimension: 3
+resolution: 64
