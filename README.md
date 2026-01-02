@@ -83,10 +83,14 @@ Let $v(x,y)$ satisfy
 ```math
 \Delta v = u(x,y) \qquad (x,y) \in [0,10]^2,
 ```
-$$v(x,y) = 0, \qquad (x,y)\in \partial([0,10]^2),$$
+```math
+v(x,y) = 0, \qquad (x,y)\in \partial([0,10]^2),
+```
 so that $v$ is a solution of the Poisson equation with source $u$ and homogeneous
-Dirichlet boundary conditions. Let $u$ be a random function defined by\
-$$ u(x) = \sum_{k=-6}^6\sum_{\ell=-6}^6 \frac{3a_{k\ell}}{1+k^2+\ell^2}\sin\left(\frac{2\pi}{10} (kx + \ell y)\right), $$
+Dirichlet boundary conditions. Let $u$ be a random function defined by
+```math
+u(x) = \sum_{k=-6}^6\sum_{\ell=-6}^6 \frac{3a_{k\ell}}{1+k^2+\ell^2}\sin\left(\frac{2\pi}{10} (kx + \ell y)\right),
+```
 where $a_{k\ell} \sim N(0,1)$ are i.i.d. standard normal random variables.
 
 We generate a dataset $\lbrace(u_i, v_i)\rbrace_{i=1}^{2000}$ of 2000 source--solution pairs
@@ -94,9 +98,13 @@ $(u_i, v_i)$, with $u_i$ drawn i.i.d. from the distribution of $u$ above. The
 goal in each of our operator learning demos is to approximate the operator mapping
 $u \mapsto v$ taking the source function $u$ to the solution $v$. We do this
 by minimizing the relative $L^2$ loss, defined by\
-$$\mathcal{L}(\theta) = \frac{1}{2000}\sum_{i=1}^{2000} \frac{\|G_\theta(u_i) - v_i\|_{L^2}^2}{\|v_i\|_{L^2}^2},$$\
+```math
+\mathcal{L}(\theta) = \frac{1}{2000}\sum_{i=1}^{2000} \frac{\|G_\theta(u_i) - v_i\|_{L^2}^2}{\|v_i\|_{L^2}^2},
+```
 where the $L^2$ norm $\|f\|_{L^2}$ is defined by\
-$$\|f\|_{L^2}^2 = \int_0^{10}\int_0^{10} |f(x,y)|^2\;\text{d}x\;\text{d}y.$$\
+```math
+\|f\|_{L^2}^2 = \int_0^{10}\int_0^{10} |f(x,y)|^2\;\text{d}x\;\text{d}y.
+```
 All demo experiments report results using relative $L^2$ loss.
 
 ### Running the demos
