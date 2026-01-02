@@ -87,7 +87,7 @@ Dirichlet boundary conditions. Let $u$ be a random function defined by\
 $$u(x) = \sum_{k=-6}^6\sum_{\ell=-6}^6 \frac{3a_{k\ell}}{1+k^2+\ell^2}\sin\left(\frac{2\pi}{10} (kx + \ell y)\right),$$\
 where $a_{k\ell} \sim N(0,1)$ are i.i.d. standard normal random variables.
 
-We generate a dataset $\{(u_i, v_i)\}_{i=1}^{2000}$ of 2000 source--solution pairs
+We generate a dataset $\lbrace(u_i, v_i)\rbrace_{i=1}^{2000}$ of 2000 source--solution pairs
 $(u_i, v_i)$, with $u_i$ drawn i.i.d. from the distribution of $u$ above. The
 goal in each of our operator learning demos is to approximate the operator mapping
 $u \mapsto v$ taking the source function $u$ to the solution $v$. We do this
