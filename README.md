@@ -4,9 +4,13 @@ This repository contains simple, unified implementations of popular
 operator learning models, such as
 
 - DeepONet
+- PCA-Net
+- Mulftifidelity Encode-Approximate-Reconstruct (MFEAR) 
 - Shift-DeepONet
 - HyperDeepONet
+- Two-Step DeepONet
 - Fourier Neural Operator (FNO)
+- General Neural Operator Transformer (GNOT)
 - More in the future!
 
 ## Installing
@@ -18,8 +22,6 @@ This repository also requires PyTorch and `mlx`, my machine learning utility
 library, which can be found [here](https://github.com/jacobhauck/ML-Template).
 
 ## What is Operator Learning?
-
-## Important Implementation Concepts
 
 Here we outline the important concepts underlying our implementations
 of operator learning models, which are crucial for increasing
@@ -72,3 +74,59 @@ this simple approach to allow for batch parallelization.
 In a similar way, datasets should keep track of which observations use
 the same discrete representation in a way that facilitates sampling
 batches with the same representation.
+
+## Demo Experiments
+
+Operator learning demos are provided for all the models implemented. We
+use the same problem for each demo, which is a simple 2D Poisson problem.
+Let $v(x)$ satisfy
+$$
+\begin{alignedat}{2}
+\Delta v &= u(x,y)& \qquad &(x,y) \in [0,10]^2, \\
+v(x,y) &= 0,& \qquad &(x,y)\in \partial([0,10]^2),
+\end{alignedat}
+$$
+so that $v$ is a solution of the Poisson equation with source $u$ and homogeneous
+Dirichlet boundary conditions. Let $u$ be a random function defined by
+$$
+u(x) = \sum_{k=-6}^6\sum_{\ell=-6}^6 \frac{3a_{k\ell}}{1+k^2+\ell^2}\sin\left(\frac{2\pi}{10} (kx + \ell y)\right), 
+$$
+where $a_{k\ell} \sim N(0,1)$ are i.i.d. standard normal random variables.
+
+We generate a dataset $\{(u_i, v_i)\}_{i=1}^{2000}$ of 2000 source--solution pairs
+$(u_i, v_i)$, with $u_i$ drawn i.i.d. from the distribution of $u$ above. The
+goal in each of our operator learning demos is to approximate the operator mapping
+$u \mapsto v$ taking the source function $u$ to the solution $v$. We do this
+by minimizing the relative $L^2$ loss, defined by
+$$
+\mathcal{L}(\theta) = \frac{1}{2000}\sum_{i=1}^{2000} \frac{\|G_\theta(u_i) - v_i\|_{L^2}^2}{\|v_i\|_{L^2}^2},
+$$
+where the $L^2$ norm $\|f\|_{L^2}$ is defined by
+$$
+\|f\|_{L^2}^2 = \int_0^{10}\int_0^{10} |f(x,y)|^2\;\text{d}x\;\text{d}y.
+$$
+All demo experiments report results using relative $L^2$ loss.
+
+### Running the demos
+
+The demo experiments are implemented using my machine learning experiment library,
+[mlx](https://github.com/jacobhauck/ML-Template). Thus, to run the main demo for,
+say, DeepONet, you simply use the command
+```commandline
+python -m mlx.run deeponet poisson
+```
+from the project directory. This runs the `deeponet` experiment found in the
+`experiments` directory using the global configuration options defined in
+`experiments/poisson.yaml`. See [mlx](https://github.com/jacobhauck/ML-Template)
+for more information on how to create and run experiments.
+
+### Other demos
+
+In addition to the operator learning demos, there are also some debug demos
+showing how some of the helper functions, like dataset generators, work. These
+include:
+- `fourier_feature_test` tests Fourier feature expansion modules used by several
+  models
+- `poisson_generate` tests Poisson dataset generation
+- `mfear/test_integrator` tests the MFEAR numerical integration
+- `pcanet/visualize_bases` tests the PCA implementation in PCA-Net
