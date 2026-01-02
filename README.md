@@ -101,7 +101,8 @@ by minimizing the relative $L^2$ loss, defined by
 ```math
 \mathcal{L}(\theta) = \frac{1}{2000}\sum_{i=1}^{2000} \frac{\|G_\theta(u_i) - v_i\|_{L^2}^2}{\|v_i\|_{L^2}^2},
 ```
-where the $L^2$ norm $\lVert f\rVert_{L^2}$ is defined by
+where $G_\theta$ is the operator learning model with parameter vector $\theta$, and
+the $L^2$ norm $\lVert f\rVert_{L^2}$ is defined by
 ```math
 \|f\|_{L^2}^2 = \int_0^{10}\int_0^{10} |f(x,y)|^2\;\text{d}x\;\text{d}y.
 ```
