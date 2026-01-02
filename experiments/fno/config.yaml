@@ -33,8 +33,3 @@ model:
     d_out: 1
     activation:
       name: GELU
-
-training:
-  lr: 0.001
-  iterations: 5000
-  batch_size: 1

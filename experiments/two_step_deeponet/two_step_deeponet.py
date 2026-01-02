@@ -1,108 +1,122 @@
 import mlx
 import torch
-import torch.utils.data
 from operatorlearning.modules import two_step_deeponet
-import operatorlearning.data.synthetic.poisson as poisson
 import operatorlearning as ol
+from experiments.poisson import BasePoissonTrainer
 
 
-class TwoStepDeepONetDemoExperiment(mlx.Experiment):
-    def run(self, config, name, group=None):
-        model = mlx.create_model(config['model'])
-        model.to(config['device'])
-        helper = two_step_deeponet.TrainingHelper(config['training']['dataset_size'], model)
-        helper.to(config['device'])
+class TwoStepDeepONetPoissonTrainer(BasePoissonTrainer):
+    helper = None
+    current_step = None
 
-        source_gen = poisson.DenseSourceGenerator(
-            [6, 6], lambda k: 3/(1.0 + k[:, 0:1]**2 + k[:, 1:2]**2)
-        ).to(config['device'])
-        gen = poisson.PoissonDataGenerator(
-            torch.tensor([0.0, 0.0]),
-            torch.tensor([10.0, 10.0]),
-            source_gen
-        ).to(config['device'])
+    def load_datasets(self, config):
+        datasets, data_loaders = super().load_datasets(config)
+        for name in datasets:
+            datasets[name] = two_step_deeponet.IndexedDataset(datasets[name])
+            data_loaders[name] = torch.utils.data.DataLoader(
+                datasets[name],
+                batch_size=data_loaders[name].batch_size,
+                shuffle=True,
+            )
+        return datasets, data_loaders
 
-        dataset_sources, dataset_solutions = [], []
-        for _ in range(config['training']['dataset_size']):
-            sources, solutions = gen(1)
-            dataset_sources.append(sources[0])
-            dataset_solutions.append(solutions[0])
-        dataset_base = poisson.PoissonDataset(dataset_sources, dataset_solutions)
-        dataset = two_step_deeponet.IndexedDataset(dataset_base)
-        data_loader = torch.utils.data.DataLoader(
-            dataset,
-            batch_size=config['training']['batch_size'],
-            shuffle=True
-        )
+    def apply_model(self, source):
+        return self.model(u=source, x_out=self.grid_batch)
 
-        grid = ol.GridFunction.uniform_x(gen.a, gen.b, num=31).to(config['device'])
-        # (H, W, 2)
-        grid_batch = torch.tile(
-            grid[None],
-            (config['training']['batch_size'],) + (1,) * len(grid.shape)
-        )  # (B, H, W, 2)
-        dataset_base.x = grid
+    def num_step_1_steps(self):
+        return self.config['training']['epochs'] * len(self.data_loaders['train'])
 
-        # Step 1 training
-        optim1 = torch.optim.Adam(
-            list(model.deeponet.trunk_net.parameters()) + list(helper.parameters()),
-            lr=config['training']['step_1']['lr']
-        )
-        losses = []
-        loss_fn = mlx.modules.RelativeL2Loss()
-        for epoch in range(config['training']['step_1']['epochs']):
-            for batch, (indices, _, solutions) in enumerate(data_loader):
-                optim1.zero_grad()
-                a = helper(indices, step=1)
-                pred_solutions = model.step_one(a, grid_batch)
-                loss = loss_fn(pred_solutions, solutions)
-                loss.backward()
-                optim1.step()
-                losses.append(loss.item())
-                print(f'Step 1 epoch {epoch}, batch {batch}: loss = {sum(losses[-500:]) / min(500, len(losses)):.05f}')
+    def set_step_1(self):
+        trunk_params = list(self.model.deeponet.trunk_net.parameters())
+        self.helper = two_step_deeponet.TrainingHelper(len(self.datasets['train']), self.model)
+        a_matrix = list(self.helper.parameters())
+        self.optim = mlx.create_optimizer(trunk_params + a_matrix, self.config['optim'])
+        self.current_step = 1
 
-        helper.set_target_matrix(grid)
+    def set_step_2(self):
+        self.loss_fn = torch.nn.MSELoss()
+        branch_params = self.model.deeponet.branch_net.parameters()
+        self.helper.set_target_matrix(self.datasets['train'].base_dataset.x)
+        self.optim = mlx.create_optimizer(branch_params, self.config['optim'])
+        self.current_step = 2
 
-        # Step 2 training
-        optim2 = torch.optim.Adam(
-            model.deeponet.branch_net.parameters(),
-            lr=config['training']['step_2']['lr']
-        )
-        loss_fn = torch.nn.MSELoss()
-        losses = []
-        for epoch in range(config['training']['step_2']['epochs']):
-            for batch, (indices, sources, _) in enumerate(data_loader):
-                optim2.zero_grad()
-                target = helper(indices, step=2)
-                pred = model.step_two(sources)
-                loss = loss_fn(pred, target.T)
-                loss.backward()
-                optim2.step()
-                losses.append(loss.item())
-                print(f'Step 2 epoch {epoch}, batch {batch}: loss = {sum(losses[-500:]) / min(500, len(losses)):.05f}')
+    def loss(self, batch):
+        indices, initial, final = batch
 
-        # Testing
-        model.train(False)
-        losses = []
-        for i in range(100):
-            sources, solutions = gen(1)
-            source_disc = torch.stack([source(grid) for source in sources])  # (1, H, W, 1)
-            sol_disc = torch.stack([sol(grid) for sol in solutions])  # (1, H, W, 1)
-            pred = model(u=source_disc, x_out=grid[None])
-            loss = loss_fn(pred, sol_disc) / loss_fn(sol_disc, torch.zeros_like(sol_disc))
-            losses.append(loss.item())
-        losses = torch.tensor(losses)
+        if self.run.step == self.num_step_1_steps():
+            self.save_checkpoint()
+            print('Starting step 2 training')
+            self.set_step_2()
 
-        print('Average loss:', losses.mean().item())
-        print('Standard deviation:', losses.std().item())
+        if self.current_step == 0:  # Evaluation mode
+            pred = self.model(initial, x_out=self.grid_batch[0:1])
+            loss = self.loss_fn(pred, final)
+            return pred, {'objective': loss}
+        elif self.current_step == 1:
+            a = self.helper(indices, step=1)
+            pred_final = self.model.step_one(a, self.grid_batch)
+            loss = self.loss_fn(pred_final, final)
+            return pred_final, {'objective': loss}
+        else:
+            target = self.helper(indices, step=2)
+            pred = self.model.step_two(initial)
+            loss = self.loss_fn(pred, target.T)
+            return pred, {'objective': loss}
 
-        source, solution = gen(1)
-        solution_pred = ol.GridFunction(
-            model(u=source[0](grid)[None], x_out=grid[None])[0].detach().cpu(),
-            x=grid.cpu(),
+    def evaluate(self, datasets=('train',)):
+        old_step = self.current_step
+        self.current_step = 0
+        result = super().evaluate(datasets)
+        self.current_step = old_step
+        return result
+
+    def dump_additional_state(self):
+        return {'helper': self.helper.state_dict()}
+
+    def load_additional_state(self, state):
+        if self.helper is None:
+            self.helper = two_step_deeponet.TrainingHelper(len(self.datasets['train']), self.model)
+            self.helper.to(self.device)
+        self.helper.load_state_dict(state['helper'])
+
+
+class TwoStepDeepONetDemoExperiment(mlx.WandBExperiment):
+    def wandb_run(self, config, run):
+        trainer = TwoStepDeepONetPoissonTrainer(config, run)
+
+        if run.step is None or run.step == 0:
+            trainer.set_step_1()
+        step_1_epochs = config['training']['epochs']
+        step_2_epochs = config['training'].get('epochs2', step_1_epochs)
+        trainer.train(step_1_epochs + step_2_epochs)
+
+        losses, _ = trainer.evaluate(datasets=('train', 'test'))
+
+        for dataset, dataset_losses in losses.items():
+            print(f'===== Losses for {dataset} =====')
+            for loss_name, loss_vals in dataset_losses.items():
+                print(f'Loss {loss_name}')
+                print(f'Mean: {loss_vals.mean()}')
+                print(f'Median: {loss_vals.median()}')
+                print(f'Standard deviation: {loss_vals.std()}')
+                print()
+            print()
+
+        _, source, solution = trainer.datasets['test'][0]
+
+        solution_fn = ol.GridFunction(
+            solution, x=trainer.grid,
             interpolator=ol.GridInterpolator(extend='periodic'),
-            x_min=gen.a.cpu(), x_max=gen.b.cpu()
+            x_min=torch.tensor([0.0, 0.0]),
+            x_max=torch.tensor([10.0, 10.0])
         )
-        source[0].cpu().quick_visualize()
-        solution[0].cpu().quick_visualize()
-        solution_pred.cpu().quick_visualize()
+
+        solution_pred = ol.GridFunction(
+            trainer.model(u=source[None], x_out=trainer.grid_batch)[0].detach(),
+            x=trainer.grid,
+            interpolator=ol.GridInterpolator(extend='periodic'),
+            x_min=torch.tensor([0.0, 0.0]),
+            x_max=torch.tensor([10.0, 10.0])
+        )
+        solution_fn.quick_visualize()
+        solution_pred.quick_visualize()

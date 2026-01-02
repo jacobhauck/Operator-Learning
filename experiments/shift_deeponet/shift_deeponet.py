@@ -4,19 +4,14 @@ import operatorlearning as ol
 from experiments.poisson import BasePoissonTrainer
 
 
-class PCANetPoissonTrainer(BasePoissonTrainer):
+class ShiftDeepONetPoissonTrainer(BasePoissonTrainer):
     def apply_model(self, source):
-        return self.model(source)
+        return self.model(u=source, x_out=self.grid_batch)
 
 
-class PCANetDemoExperiment(mlx.WandBExperiment):
+class ShiftDeepONetDemoExperiment(mlx.WandBExperiment):
     def wandb_run(self, config, run):
-        config['model']['u_sample_shape'] = (32, 32, 1)
-        config['model']['v_sample_shape'] = (32, 32, 1)
-        trainer = PCANetPoissonTrainer(config, run)
-        trainer.datasets['train'].x = None
-        trainer.model.fit_pca(trainer.datasets['train'], trainer.grid, trainer.grid)
-        trainer.datasets['train'].x = trainer.grid
+        trainer = ShiftDeepONetPoissonTrainer(config, run)
         trainer.train(config['training']['epochs'])
         losses, _ = trainer.evaluate(datasets=('train', 'test'))
 
@@ -40,7 +35,7 @@ class PCANetDemoExperiment(mlx.WandBExperiment):
         )
 
         solution_pred = ol.GridFunction(
-            trainer.model(source[None])[0].detach(),
+            trainer.model(u=source[None], x_out=trainer.grid_batch)[0].detach(),
             x=trainer.grid,
             interpolator=ol.GridInterpolator(extend='periodic'),
             x_min=torch.tensor([0.0, 0.0]),

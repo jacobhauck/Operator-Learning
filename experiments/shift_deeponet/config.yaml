@@ -1,27 +1,25 @@
 model:
-  name: operatorlearning.modules.two_step_deeponet.TwoStepDeepONet
-  num_branches: &num_branches 64
-  deeponet:
-    name: operatorlearning.modules.deeponet.DeepONet
+  name: operatorlearning.modules.shift_deeponet.ShiftDeepONet
+  deeponet_config:
     branch_config:
       name: operatorlearning.modules.deeponet.MLPBranchNet
       num_sensors: 1024
-      num_branches: *num_branches
+      num_branches: 32
       mlp_config:
         hidden_layers:
-          - 512
           - 256
           - 128
+          - 64
         activation:
           name: ReLU
     trunk_config:
       name: operatorlearning.modules.deeponet.MLPTrunkNet
-      num_branches: *num_branches
+      num_branches: 32
       v_d_in: 2
       v_d_out: 1
       mlp_config:
         hidden_layers:
-          - 128
+          - 64
           - 128
           - 128
         activation:
@@ -30,7 +28,19 @@ model:
         name: operatorlearning.modules.deeponet.FourierFeatureExpansion
         origin: [0, 0]
         scale: [10, 10]
-        mode: full
-        features: 6
-        learnable: false
+        mode: random
+        features: 64
+        learnable: true
+    scale: sqrt
     bias: true
+  shift_net_config:
+    name: operatorlearning.modules.deeponet.MLPBranchNet
+    num_sensors: 1024
+    num_branches: 6
+    mlp_config:
+      hidden_layers:
+        - 32
+        - 32
+        - 32
+      activation:
+        name: ReLU

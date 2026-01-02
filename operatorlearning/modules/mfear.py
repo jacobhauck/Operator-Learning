@@ -13,6 +13,7 @@ class TrapezoidIntegrator(torch.nn.Module):
     and maximal points are used as bounds of integration domain.
     """
 
+    # noinspection PyMethodMayBeStatic
     def forward(self, f, x):
         """
         :param f: (B, *in_shape, d_out) function sample values
@@ -65,7 +66,6 @@ class CompactMLPBasis(torch.nn.Module):
         mlp['name'] = 'MLP'
         mlp['d_in'] = d_in
         mlp['d_out'] = d_out * p
-        print(mlp)
         self.mlp = mlx.create_module(mlp)
 
     def forward(self, x):

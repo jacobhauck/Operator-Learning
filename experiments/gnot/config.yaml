@@ -32,8 +32,3 @@ model:
     num_heads: 4
     activation:
       name: GELU
-
-training:
-  lr: 0.0001
-  iterations: 20000
-  batch_size: 4

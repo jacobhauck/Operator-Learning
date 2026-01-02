@@ -1,64 +1,45 @@
 import mlx
 import torch
-import operatorlearning.data.synthetic.poisson as poisson
 import operatorlearning as ol
+from experiments.poisson import BasePoissonTrainer
 
 
-class DeepONetDemoExperiment(mlx.Experiment):
-    def run(self, config, name, group=None):
-        model = mlx.create_model(config['model'])
-        optim = torch.optim.Adam(model.parameters(), lr=config['training']['lr'])
+class DeepONetPoissonTrainer(BasePoissonTrainer):
+    def apply_model(self, source):
+        return self.model(u=source, x_out=self.grid_batch)
 
-        source_gen = poisson.DenseSourceGenerator(
-            [6, 6], lambda k: 3/(1.0 + k[:, 0:1]**2 + k[:, 1:2]**2)
-        )
-        gen = poisson.PoissonDataGenerator(
-            torch.tensor([0.0, 0.0]),
-            torch.tensor([10.0, 10.0]),
-            source_gen
-        )
-        loss_fn = mlx.modules.RelativeL2Loss()
 
-        grid = ol.GridFunction.uniform_x(gen.a, gen.b, num=31)  # (H, W, 2)
-        grid_batch = torch.tile(
-            grid[None],
-            (config['training']['batch_size'],) + (1,) * len(grid.shape)
-        )  # (B, H, W, 2)
+class DeepONetDemoExperiment(mlx.WandBExperiment):
+    def wandb_run(self, config, run):
+        trainer = DeepONetPoissonTrainer(config, run)
+        trainer.train(config['training']['epochs'])
+        losses, _ = trainer.evaluate(datasets=('train', 'test'))
 
-        for i in range(config['training']['iterations']):
-            sources, solutions = gen(config['training']['batch_size'])
-            in_batch = torch.stack([source(grid) for source in sources])  # (B, H, W, 1)
-            out_batch = torch.stack([sol(grid) for sol in solutions])  # (B, H, W, 1)
+        for dataset, dataset_losses in losses.items():
+            print(f'===== Losses for {dataset} =====')
+            for loss_name, loss_vals in dataset_losses.items():
+                print(f'Loss {loss_name}')
+                print(f'Mean: {loss_vals.mean()}')
+                print(f'Median: {loss_vals.median()}')
+                print(f'Standard deviation: {loss_vals.std()}')
+                print()
+            print()
 
-            optim.zero_grad()
-            pred_batch = model(u=in_batch, x_out=grid_batch)
-            loss = loss_fn(pred_batch, out_batch)
-            loss.backward()
-            optim.step()
+        source, solution = trainer.datasets['test'][0]
 
-            print(f'Batch {i}: loss = {loss.item():.06f}')
-
-        model.train(False)
-        losses = []
-        for i in range(100):
-            sources, solutions = gen(1)
-            source_disc = torch.stack([source(grid) for source in sources])  # (B, H, W, 1)
-            sol_disc = torch.stack([sol(grid) for sol in solutions])  # (B, H, W, 1)
-            pred = model(u=source_disc, x_out=grid[None])
-            loss = loss_fn(pred, sol_disc)
-            losses.append(loss.item())
-        losses = torch.tensor(losses)
-
-        print('Average loss:', losses.mean().item())
-        print('Standard deviation:', losses.std().item())
-
-        source, solution = gen(1)
-        solution_pred = ol.GridFunction(
-            model(u=source[0](grid)[None], x_out=grid[None])[0].detach(),
-            x=grid,
+        solution_fn = ol.GridFunction(
+            solution, x=trainer.grid,
             interpolator=ol.GridInterpolator(extend='periodic'),
-            x_min=gen.a, x_max=gen.b
+            x_min=torch.tensor([0.0, 0.0]),
+            x_max=torch.tensor([10.0, 10.0])
         )
-        source[0].quick_visualize()
-        solution[0].quick_visualize()
+
+        solution_pred = ol.GridFunction(
+            trainer.model(u=source[None], x_out=trainer.grid_batch)[0].detach(),
+            x=trainer.grid,
+            interpolator=ol.GridInterpolator(extend='periodic'),
+            x_min=torch.tensor([0.0, 0.0]),
+            x_max=torch.tensor([10.0, 10.0])
+        )
+        solution_fn.quick_visualize()
         solution_pred.quick_visualize()

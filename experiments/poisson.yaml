@@ -1,0 +1,13 @@
+use_wandb: false
+
+training:
+  dataset_size: 2000
+  epochs: 10
+  batch_size: 1
+
+testing:
+  dataset_size: 200
+
+optim:
+  name: Adam
+  lr: 0.001
