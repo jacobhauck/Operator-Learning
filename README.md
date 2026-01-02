@@ -79,9 +79,9 @@ batches with the same representation.
 
 Operator learning demos are provided for all the models implemented. We
 use the same problem for each demo, which is a simple 2D Poisson problem.
-Let $v(x)$ satisfy\
+Let $v(x,7)$ satisfy\
 $$\Delta v = u(x,y) \qquad (x,y) \in [0,10]^2,$$\
-$$v(x,y) = 0, \qquad (x,y)\in \partial([0,10]^2),$$
+$$v(x,y) = 0, \qquad (x,y)\in \partial([0,10]^2),$$\
 so that $v$ is a solution of the Poisson equation with source $u$ and homogeneous
 Dirichlet boundary conditions. Let $u$ be a random function defined by\
 $$u(x) = \sum_{k=-6}^6\sum_{\ell=-6}^6 \frac{3a_{k\ell}}{1+k^2+\ell^2}\sin\left(\frac{2\pi}{10} (kx + \ell y)\right),$$\
