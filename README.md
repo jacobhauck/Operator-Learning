@@ -79,10 +79,8 @@ batches with the same representation.
 
 Operator learning demos are provided for all the models implemented. We
 use the same problem for each demo, which is a simple 2D Poisson problem.
-Let $v(x)$ satisfy
-$$
-\Delta v = u(x,y) \qquad (x,y) \in [0,10]^2,
-$$
+Let $v(x,y)$ satisfy
+$$\Delta v = u(x,y) \qquad (x,y) \in [0,10]^2,$$
 $$
 v(x,y) = 0, \qquad (x,y)\in \partial([0,10]^2),
 $$
