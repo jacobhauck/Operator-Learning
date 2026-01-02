@@ -97,11 +97,11 @@ We generate a dataset $\lbrace(u_i, v_i)\rbrace_{i=1}^{2000}$ of 2000 source--so
 $(u_i, v_i)$, with $u_i$ drawn i.i.d. from the distribution of $u$ above. The
 goal in each of our operator learning demos is to approximate the operator mapping
 $u \mapsto v$ taking the source function $u$ to the solution $v$. We do this
-by minimizing the relative $L^2$ loss, defined by\
+by minimizing the relative $L^2$ loss, defined by
 ```math
 \mathcal{L}(\theta) = \frac{1}{2000}\sum_{i=1}^{2000} \frac{\|G_\theta(u_i) - v_i\|_{L^2}^2}{\|v_i\|_{L^2}^2},
 ```
-where the $L^2$ norm $\|f\|_{L^2}$ is defined by\
+where the $L^2$ norm $\|f\|_{L^2}$ is defined by
 ```math
 \|f\|_{L^2}^2 = \int_0^{10}\int_0^{10} |f(x,y)|^2\;\text{d}x\;\text{d}y.
 ```
