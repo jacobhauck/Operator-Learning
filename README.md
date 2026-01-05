@@ -25,7 +25,8 @@ library, which can be found [here](https://github.com/jacobhauck/ML-Template).
 
 Here we outline the important concepts underlying our implementations
 of operator learning models, which are crucial for increasing
-simplicity, unity and flexibility.
+simplicity, unity and flexibility. Check out [my paper](https://arxiv.org/abs/2507.07292)
+for more details!
 
 ### Functions
 
