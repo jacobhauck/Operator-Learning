@@ -25,7 +25,8 @@ library, which can be found [here](https://github.com/jacobhauck/ML-Template).
 
 Here we outline the important concepts underlying our implementations
 of operator learning models, which are crucial for increasing
-simplicity, unity and flexibility.
+simplicity, unity and flexibility. Check out [my paper](https://arxiv.org/abs/2507.07292)
+for more details!
 
 ### Functions
 
@@ -79,15 +80,15 @@ batches with the same representation.
 
 Operator learning demos are provided for all the models implemented. We
 use the same problem for each demo, which is a simple 2D Poisson problem.
-Let $v(x,y)$ satisfy
+Let $v(x,y)$ be a periodic function on $[0,10]^2$ that satisfies
 ```math
 \Delta v = u(x,y) \qquad (x,y) \in [0,10]^2,
 ```
 ```math
-v(x,y) = 0, \qquad (x,y)\in \partial([0,10]^2),
+v(0,0) = 0
 ```
-so that $v$ is a solution of the Poisson equation with source $u$ and homogeneous
-Dirichlet boundary conditions. Let $u$ be a random function defined by
+so that $v$ is the unique solution of the Poisson equation with source $u$ and
+periodic boundary conditions and $v(0,0) = 0$. Let $u$ be a random function defined by
 ```math
 u(x) = \sum_{k=-6}^6\sum_{\ell=-6}^6 \frac{3a_{k\ell}}{1+k^2+\ell^2}\sin\left(\frac{2\pi}{10} (kx + \ell y)\right),
 ```
@@ -97,11 +98,12 @@ We generate a dataset $\lbrace(u_i, v_i)\rbrace_{i=1}^{2000}$ of 2000 source--so
 $(u_i, v_i)$, with $u_i$ drawn i.i.d. from the distribution of $u$ above. The
 goal in each of our operator learning demos is to approximate the operator mapping
 $u \mapsto v$ taking the source function $u$ to the solution $v$. We do this
-by minimizing the relative $L^2$ loss, defined by\
+by minimizing the relative $L^2$ loss, defined by
 ```math
 \mathcal{L}(\theta) = \frac{1}{2000}\sum_{i=1}^{2000} \frac{\|G_\theta(u_i) - v_i\|_{L^2}^2}{\|v_i\|_{L^2}^2},
 ```
-where the $L^2$ norm $\|f\|_{L^2}$ is defined by\
+where $G_\theta$ is the operator learning model with parameter vector $\theta$, and
+the $L^2$ norm $\lVert f\rVert_{L^2}$ is defined by
 ```math
 \|f\|_{L^2}^2 = \int_0^{10}\int_0^{10} |f(x,y)|^2\;\text{d}x\;\text{d}y.
 ```
