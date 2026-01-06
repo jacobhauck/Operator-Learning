@@ -4,6 +4,7 @@ last_visualization.pdf
 # ML Template
 /datasets/
 /weights/
+/.checkpoints/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

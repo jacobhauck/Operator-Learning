@@ -50,30 +50,41 @@ class TrapezoidIntegrator(torch.nn.Module):
 
 
 class CompactMLPBasis(torch.nn.Module):
-    def __init__(self, mlp, p, d_in, d_out):
+    def __init__(self, mlp, p, d_in, d_out, feat_expansion=None):
         """
         :param mlp: Config of underlying MLP
         :param p: Number of basis functions
         :param d_in: Input dimension
         :param d_out: Output dimension
+        :param feat_expansion: Optional config for a feature 
+            expansion module. Should map (B, *shape, d_in) 
+            to (B, *shape, feat_expansion.num_features)
         """
         super().__init__()
         self.p = p
         self.d_in = d_in
         self.d_out = d_out
+        
+        if feat_expansion is not None:
+            self.feat_expansion = mlx.create_module(feat_expansion)
+        else:
+            self.feat_expansion = None
 
         mlp = dict(mlp)
         mlp['name'] = 'MLP'
-        mlp['d_in'] = d_in
+        mlp['d_in'] = d_in if self.feat_expansion is None else self.feat_expansion.num_features
         mlp['d_out'] = d_out * p
         self.mlp = mlx.create_module(mlp)
 
     def forward(self, x):
         """
-        :param x: (B, *in_shape, d_in) Points at which to compute the basis
-        :return: (b, *in_shape, p, d_out) Basis functions evaluated at x
+        :param x: (B, *shape, d_in) Points at which to compute the basis
+        :return: (b, *shape, p, d_out) Basis functions evaluated at x
         """
-        packed = self.mlp(x)  # (B, *in_shape, p*d_out)
+        if self.feat_expansion is not None:
+            x = self.feat_expansion(x)  # (B, *shape, num_features)
+
+        packed = self.mlp(x)  # (B, *shape, p*d_out)
         return packed.reshape(*packed.shape[:-1], self.p, self.d_out)
 
 
@@ -114,7 +125,7 @@ class MFEAR(torch.nn.Module):
             given by x_out
         """
         encoder_basis = self.encoder_net(x_in)  # (B, *in_shape, p, u_d_out)
-        prod = (u[..., None, :] * encoder_basis).sum(dim=-1)
+        prod = torch.einsum('B...d,B...pd->B...p', u, encoder_basis)
         # (B, *in_shape, p)
 
         z = self.integrator(prod, x_in)  # (B, p)

@@ -214,7 +214,14 @@ class MLPTrunkNet(torch.nn.Module):
 
 
 class FourierFeatureExpansion(torch.nn.Module):
-    def __init__(self, origin, scale, features: int, mode: str = 'full', learnable=False):
+    def __init__(
+            self,
+            origin,
+            scale,
+            features: int,
+            mode: str = 'full',
+            learnable: bool = False
+    ):
         """
         :param origin: Origin of Fourier features, list of coordinates
             [x_1, ..., x_d]

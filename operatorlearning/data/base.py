@@ -128,7 +128,7 @@ class OLDataset(torch.utils.data.Dataset):
         self.v_indices = v_indices_rel[v_order].numpy().tolist()
 
     def __len__(self):
-        return len(self.u_discretizations)
+        return len(self.u_indices)
 
     def __getitem__(self, index):
         u_key, u_index = self.u_keys[index], self.u_indices[index]
