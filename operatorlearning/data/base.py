@@ -56,7 +56,8 @@ class SameRepresentationBatchSampler:
 
 class OLDataset(torch.utils.data.Dataset):
     def __init__(self, file_name, stream_uv=True, stream_xy=False):
-        self.file = h5py.File(file_name)
+        self.file_name = file_name
+        file = h5py.File(file_name)
 
         assert 'x' in self.file.keys(), 'Invalid dataset file: no group named "x"'
         self.x = None if stream_xy else {}
@@ -129,7 +130,10 @@ class OLDataset(torch.utils.data.Dataset):
         self.u_indices = u_indices_rel[u_order].numpy().tolist()
         self.v_keys = [v_keys[int(i)] for i in v_order]
         self.v_indices = v_indices_rel[v_order].numpy().tolist()
-
+        
+        file.close()
+        self.file = None
+    
     def __len__(self):
         return len(self.u_indices)
 
@@ -141,27 +145,29 @@ class OLDataset(torch.utils.data.Dataset):
         v_disc_id = self.v_disc_ids[v_key]
 
         if self.x is None:
+            if self.file is None:
+                self.file = h5py.File(self.file_name)
+            
             x = self.file['x'][self.x_keys[u_disc_id]][()]
             x = torch.from_numpy(x)
-        else:
-            x = self.x[u_disc_id]
-
-        if self.y is None:
+            
             y = self.file['y'][self.y_keys[v_disc_id]][()]
             y = torch.from_numpy(y)
         else:
+            x = self.x[u_disc_id]
             y = self.y[v_disc_id]
 
         if self.u is None:
+            if self.file is None:
+                self.file = h5py.File(self.file_name)
+            
             u = self.file['u'][u_key]['u'][u_index]
             u = torch.from_numpy(u)
-        else:
-            u = self.u[u_key][u_index]
-
-        if self.v is None:
+            
             v = self.file['v'][v_key]['v'][v_index]
             v = torch.from_numpy(v)
         else:
+            u = self.u[u_key][u_index]
             v = self.v[v_key][v_index]
 
         return u, x, v, y
