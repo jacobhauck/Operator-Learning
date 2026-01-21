@@ -59,33 +59,33 @@ class OLDataset(torch.utils.data.Dataset):
         self.file_name = file_name
         file = h5py.File(file_name)
 
-        assert 'x' in self.file.keys(), 'Invalid dataset file: no group named "x"'
+        assert 'x' in file.keys(), 'Invalid dataset file: no group named "x"'
         self.x = None if stream_xy else {}
         self.x_keys = {}
-        x_group = self.file['x']
+        x_group = file['x']
         for key in x_group.keys():
             x_id = int(x_group[key].attrs['id'])
             self.x_keys[x_id] = key
             if not stream_xy:
                 self.x[x_id] = torch.from_numpy(x_group[key][()])
 
-        assert 'y' in self.file.keys(), 'Invalid dataset file: no group named "y"'
+        assert 'y' in file.keys(), 'Invalid dataset file: no group named "y"'
         self.y = None if stream_xy else {}
         self.y_keys = {}
-        y_group = self.file['y']
+        y_group = file['y']
         for key in y_group.keys():
             y_id = int(y_group[key].attrs['id'])
             self.y_keys[y_id] = key
             if not stream_xy:
                 self.y[y_id] = torch.from_numpy(y_group[key][()])
 
-        assert 'u' in self.file.keys(), 'Invalid dataset file: no group named "u"'
+        assert 'u' in file.keys(), 'Invalid dataset file: no group named "u"'
         self.u = None if stream_uv else {}
         self.u_disc_ids = {}
         u_keys = []
         u_indices = []
         u_indices_rel = []
-        u_group = self.file['u']
+        u_group = file['u']
         for key in u_group.keys():
             self.u_disc_ids[key] = int(u_group[key].attrs['disc_id'])
             u_subgroup = u_group[key]
@@ -101,13 +101,13 @@ class OLDataset(torch.utils.data.Dataset):
         u_indices_rel = torch.tensor(u_indices_rel).to(torch.long)
         u_order = u_indices.argsort()
 
-        assert 'v' in self.file.keys(), 'Invalid dataset file: no group named "v"'
+        assert 'v' in file.keys(), 'Invalid dataset file: no group named "v"'
         self.v = None if stream_uv else {}
         self.v_disc_ids = {}
         v_keys = []
         v_indices = []
         v_indices_rel = []
-        v_group = self.file['v']
+        v_group = file['v']
         for key in v_group.keys():
             self.v_disc_ids[key] = int(v_group[key].attrs['disc_id'])
             v_subgroup = v_group[key]
