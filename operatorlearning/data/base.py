@@ -55,8 +55,7 @@ class SameRepresentationBatchSampler:
 
 
 class OLDataset(torch.utils.data.Dataset):
-    def __init__(self, file_name, stream_uv=True, stream_xy=False, device=None):
-        self.device = device
+    def __init__(self, file_name, stream_uv=True, stream_xy=False):
         self.file = h5py.File(file_name)
 
         assert 'x' in self.file.keys(), 'Invalid dataset file: no group named "x"'
@@ -67,7 +66,7 @@ class OLDataset(torch.utils.data.Dataset):
             x_id = int(x_group[key].attrs['id'])
             self.x_keys[x_id] = key
             if not stream_xy:
-                self.x[x_id] = torch.from_numpy(x_group[key][()]).to(device)
+                self.x[x_id] = torch.from_numpy(x_group[key][()])
 
         assert 'y' in self.file.keys(), 'Invalid dataset file: no group named "y"'
         self.y = None if stream_xy else {}
@@ -77,15 +76,17 @@ class OLDataset(torch.utils.data.Dataset):
             y_id = int(y_group[key].attrs['id'])
             self.y_keys[y_id] = key
             if not stream_xy:
-                self.y[y_id] = torch.from_numpy(y_group[key][()]).to(device)
+                self.y[y_id] = torch.from_numpy(y_group[key][()])
 
         assert 'u' in self.file.keys(), 'Invalid dataset file: no group named "u"'
         self.u = None if stream_uv else {}
+        self.u_disc_ids = {}
         u_keys = []
         u_indices = []
         u_indices_rel = []
         u_group = self.file['u']
         for key in u_group.keys():
+            self.u_disc_ids[key] = int(u_group[key].attrs['disc_id'])
             u_subgroup = u_group[key]
             indices = torch.from_numpy(u_subgroup['indices'][()])
             u_indices.append(indices)
@@ -93,7 +94,7 @@ class OLDataset(torch.utils.data.Dataset):
             u_keys.extend([key] * len(indices))
 
             if not stream_uv:
-                self.u[key] = torch.from_numpy(u_subgroup['u'][()]).to(device)
+                self.u[key] = torch.from_numpy(u_subgroup['u'][()])
 
         u_indices = torch.cat(u_indices)
         u_indices_rel = torch.tensor(u_indices_rel).to(torch.long)
@@ -101,11 +102,13 @@ class OLDataset(torch.utils.data.Dataset):
 
         assert 'v' in self.file.keys(), 'Invalid dataset file: no group named "v"'
         self.v = None if stream_uv else {}
+        self.v_disc_ids = {}
         v_keys = []
         v_indices = []
         v_indices_rel = []
         v_group = self.file['v']
         for key in v_group.keys():
+            self.v_disc_ids[key] = int(v_group[key].attrs['disc_id'])
             v_subgroup = v_group[key]
             indices = torch.from_numpy(v_subgroup['indices'][()])
             v_indices.append(indices)
@@ -113,7 +116,7 @@ class OLDataset(torch.utils.data.Dataset):
             v_keys.extend([key] * len(indices))
 
             if not stream_uv:
-                self.v[key] = torch.from_numpy(v_subgroup['v'][()]).to(device)
+                self.v[key] = torch.from_numpy(v_subgroup['v'][()])
 
         v_indices = torch.cat(v_indices)
         v_indices_rel = torch.tensor(v_indices_rel).to(torch.long)
@@ -134,30 +137,30 @@ class OLDataset(torch.utils.data.Dataset):
         u_key, u_index = self.u_keys[index], self.u_indices[index]
         v_key, v_index = self.v_keys[index], self.v_indices[index]
 
-        u_disc_id = int(self.file['u'][u_key].attrs['disc_id'])
-        v_disc_id = int(self.file['v'][v_key].attrs['disc_id'])
+        u_disc_id = self.u_disc_ids[u_key]
+        v_disc_id = self.v_disc_ids[v_key]
 
         if self.x is None:
             x = self.file['x'][self.x_keys[u_disc_id]][()]
-            x = torch.from_numpy(x).to(self.device)
+            x = torch.from_numpy(x)
         else:
             x = self.x[u_disc_id]
 
         if self.y is None:
             y = self.file['y'][self.y_keys[v_disc_id]][()]
-            y = torch.from_numpy(y).to(self.device)
+            y = torch.from_numpy(y)
         else:
             y = self.y[v_disc_id]
 
         if self.u is None:
             u = self.file['u'][u_key]['u'][u_index]
-            u = torch.from_numpy(u).to(self.device)
+            u = torch.from_numpy(u)
         else:
             u = self.u[u_key][u_index]
 
         if self.v is None:
             v = self.file['v'][v_key]['v'][v_index]
-            v = torch.from_numpy(v).to(self.device)
+            v = torch.from_numpy(v)
         else:
             v = self.v[v_key][v_index]
 
