@@ -1,5 +1,6 @@
 import torch
 import torch.utils.data
+import numpy as np
 import h5py
 
 
@@ -148,10 +149,10 @@ class OLDataset(torch.utils.data.Dataset):
             if self.file is None:
                 self.file = h5py.File(self.file_name)
             
-            x = self.file['x'][self.x_keys[u_disc_id]][()]
+            x = self.file['x'][self.x_keys[u_disc_id]][:].copy()
             x = torch.from_numpy(x)
             
-            y = self.file['y'][self.y_keys[v_disc_id]][()]
+            y = self.file['y'][self.y_keys[v_disc_id]][:].copy()
             y = torch.from_numpy(y)
         else:
             x = self.x[u_disc_id]
@@ -161,10 +162,10 @@ class OLDataset(torch.utils.data.Dataset):
             if self.file is None:
                 self.file = h5py.File(self.file_name)
             
-            u = self.file['u'][u_key]['u'][u_index]
+            u = self.file['u'][u_key]['u'][u_index].copy()
             u = torch.from_numpy(u)
             
-            v = self.file['v'][v_key]['v'][v_index]
+            v = self.file['v'][v_key]['v'][v_index].copy()
             v = torch.from_numpy(v)
         else:
             u = self.u[u_key][u_index]

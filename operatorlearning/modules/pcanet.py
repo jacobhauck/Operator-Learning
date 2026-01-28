@@ -1,5 +1,6 @@
 import mlx
 import torch
+import operatorlearning as ol
 
 
 def pca_basis(dataset, x, num_modes, mean=None):
@@ -7,7 +8,8 @@ def pca_basis(dataset, x, num_modes, mean=None):
     Calculate a PCA basis (mean + basis functions) on a fixed set of
     sampling points
 
-    :param dataset: Dataset of functions (sequence of Function objects)
+    :param dataset: Dataset of functions (sequence of Function objects or
+        array of shape (n, *shape, d_out) of function values at x)
     :param x: (*shape, d_in) Sampling points
     :param num_modes: Number of PCA modes to keep
     :param mean: Optional (*shape, d_out) Sample values of a mean function
@@ -16,15 +18,18 @@ def pca_basis(dataset, x, num_modes, mean=None):
         the dataset, and basis (num_modes, *shape, d_out), the samples of the
         PCA basis functions
     """
-    d_out = dataset[0].d_out
-    data = torch.empty(
-        (len(dataset), *x.shape[:-1], d_out),
-        dtype=x.dtype,
-        device=x.device
-    )  # (n, *shape, d_out)
+    if isinstance(dataset[0], ol.Function):
+        d_out = dataset[0].d_out
+        data = torch.empty(
+            (len(dataset), *x.shape[:-1], d_out),
+            dtype=x.dtype,
+            device=x.device
+        )  # (n, *shape, d_out)
 
-    for i, f in enumerate(dataset):
-        data[i] = f(x)
+        for i, f in enumerate(dataset):
+            data[i] = f(x)
+    else:
+        data = dataset
 
     if mean is None:
         mean = data.mean(dim=0)  # (*shape, d_out)
@@ -84,15 +89,25 @@ class PCANet(torch.nn.Module):
         """
         Fit the model's PCA bases
         :param dataset: The dataset to fit to. Should be an iterable whose
-            elements are pairs (u, v) of input and output functions
-        :param x: (*shape, u_d_in) Points at which to sample input functions
-        :param y: (*shape, v_d_in) Points at which to sample output functions
+            elements are pairs (u, v) of input and output functions (either
+            Function objects to be evaluated at x and y or arrays of shape
+            (*in_shape, u_d_out) and (*out_shape, v_d_out) containing the
+            function values at x and y--all pairs (u, v) must be of the same
+            type)
+        :param x: (*in_shape, u_d_in) Points at which to sample input functions
+        :param y: (*out_shape, v_d_in) Points at which to sample output functions
         """
         u_dataset, v_dataset = [], []
         for u, v in dataset:
             u_dataset.append(u)
             v_dataset.append(v)
-        
+
+        if not isinstance(u_dataset[0], ol.Function):
+            u_dataset = torch.stack(u_dataset)
+
+        if not isinstance(v_dataset[0], ol.Function):
+            v_dataset = torch.stack(v_dataset)
+
         u_mean, u_basis = pca_basis(u_dataset, x, self.u_num_modes)
         v_mean, v_basis = pca_basis(v_dataset, y, self.v_num_modes)
         self.u_mean[:] = u_mean

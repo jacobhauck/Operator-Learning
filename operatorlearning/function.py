@@ -574,7 +574,7 @@ class GridFunction(Function):
 
         xs = []
         for min_i, max_i, num_i in zip(min_point, max_point, num):
-            xs.append(torch.linspace(min_i, max_i, int(num_i) + 1))
+            xs.append(torch.linspace(min_i, max_i, int(num_i)))
 
         return xs
 
