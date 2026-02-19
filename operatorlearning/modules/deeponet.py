@@ -271,6 +271,12 @@ class FourierFeatureExpansion(torch.nn.Module):
         :param y: (*out_shape, dim) input coordinates
         :return: (*out_shape, num_features) output features
         """
+        # Apparently, some broadcasting magic can allow this function to run
+        # even if the condition in the following assert is False. This is not
+        # correct behavior, so we use an assert to force an error.
+        assert y.shape[-1] == self.k.shape[1], \
+            'Wrong input feature dimension for Fourier feature expansion'
+
         angle = torch.einsum('...d,nd->...n', y, self.k)
         # (*out_shape, num_features/2)
 
