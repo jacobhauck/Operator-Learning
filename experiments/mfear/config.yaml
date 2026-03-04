@@ -18,7 +18,7 @@ model:
     name: operatorlearning.modules.mfear.CompactMLPBasis
     d_in: 2
     d_out: 1
-    p: &q 12
+    p: &q 24
     mlp:
       hidden_layers:
         - 64
