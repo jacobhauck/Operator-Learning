@@ -1,0 +1,7 @@
+num_points: 256
+differentiator:
+  name: ForwardEuler1dDifferentiator
+integrator:
+  name: SplineGridIntegrator
+  n: 1
+  mode: closed
