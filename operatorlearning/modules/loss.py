@@ -79,7 +79,6 @@ class FunctionalL1Loss(torch.nn.Module):
         """
         super().__init__()
         self.relative = relative
-        self.integrator = mlx.create_module(integrator)
         if integrator is not None:
             self.integrator = mlx.create_module(integrator)
         else:
