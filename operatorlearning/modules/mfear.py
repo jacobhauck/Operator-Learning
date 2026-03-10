@@ -5,50 +5,6 @@ import torch
 import mlx
 
 
-class TrapezoidIntegrator(torch.nn.Module):
-    """
-    Integrates using the composite trapezoid rule.
-
-    Underlying sampling points must lie on a tensor grid. Minimal
-    and maximal points are used as bounds of integration domain.
-    """
-
-    # noinspection PyMethodMayBeStatic
-    def forward(self, f, x):
-        """
-        :param f: (B, *in_shape, d_out) function sample values
-        :param x: (B, *in_shape, d_in) Points at which function is sampled. Must
-            form a tensor grid (according to the conventions of GridFunction)
-        :return: (B, d_out) integral of f over the domain using the composite
-            trapezoid rule
-        """
-        d_in = x.shape[-1]
-        assert len(x.shape) == 2 + d_in, 'x has wrong shape for tensor grid'
-
-        xs = []
-        extraction_tuple = [slice(None)] + [0] * d_in + [0]
-        for i in range(d_in):
-            if i > 0:
-                extraction_tuple[i] = 0
-            extraction_tuple[i + 1] = slice(None)
-            extraction_tuple[-1] = i
-            xs.append(x[*extraction_tuple].contiguous())
-        # list of d_in tensors of shape (B, in_shape[i])
-
-        w = torch.ones_like(x[..., 0:1])  # (B, *in_shape, 1)
-        for i, x_i in enumerate(xs):
-            w_i = torch.zeros_like(x_i)  # (B, in_shape[i])
-            w_i[:, 1:-1] = (x_i[:, 2:] - x_i[:, :-2]) / 2
-            w_i[:, 0] = (x_i[:, 1] - x_i[:, 0]) / 2
-            w_i[:, -1] = (x_i[:, -1] - x_i[:, -2]) / 2
-
-            broadcast_index = [slice(None)] + [None] * i + [slice(None)] + [None] * (d_in - i)
-            w *= w_i[*broadcast_index]
-
-        b, d_out = f.shape[0], f.shape[-1]
-        return torch.sum((w * f).view(b, -1, d_out), dim=1)  # (B, d_out)
-
-
 class CompactMLPBasis(torch.nn.Module):
     def __init__(self, mlp, p, d_in, d_out, feat_expansion=None):
         """

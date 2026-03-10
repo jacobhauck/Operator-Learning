@@ -1,5 +1,8 @@
 integrator:
-  name: operatorlearning.modules.mfear.TrapezoidIntegrator
+  name: operatorlearning.modules.integration.SplineGridIntegrator
+  n: 4  # Boole's rule
+  mode: closed
+#  name: operatorlearning.modules.integration.TrapezoidIntegrator
 
-dimension: 3
-resolution: 64
+dimension: 1
+resolution: 32
