@@ -134,7 +134,25 @@ class OLDataset(torch.utils.data.Dataset):
         
         file.close()
         self.file = None
-    
+
+    def get_representations(self):
+        """
+        Gets sample representation IDs for use with
+        SameRepresentationBatchSampler
+        :return: (len(self)) tensor of representation IDS. Two data samples have
+            the same ID if the input and output functions both use the same
+            sampling points; i.e., ID(u1,v1) = ID(u2,v2) <=> x1 = x2 AND y1 = y2
+        """
+        key_pairs = {}
+        representations = []
+        for u_key, v_key in zip(self.u_keys, self.v_keys):
+            if (u_key, v_key) not in key_pairs:
+                key_pairs[(u_key, v_key)] = len(key_pairs)
+
+            representations.append(key_pairs[(u_key, v_key)])
+
+        return torch.tensor(representations, dtype=torch.long)
+
     def __len__(self):
         return len(self.u_indices)
 
