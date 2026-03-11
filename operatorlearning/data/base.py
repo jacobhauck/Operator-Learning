@@ -282,3 +282,60 @@ class OLDataset(torch.utils.data.Dataset):
                 v_subgroup['indices'][rel_index] = i
                 v_subgroup['v'][rel_index] = v[i].numpy()
                 added_by_subgroup[int(i_group)] += 1
+
+    @staticmethod
+    def concat(file1, file2, output_file):
+        """
+        Concatenates two OLDatasets into a new one
+        :param file1: Name of first file to concatenate
+        :param file2: Name of second file to concatenate
+        :param output_file: Name of con
+        """
+        dataset1 = OLDataset(file1)
+        dataset2 = OLDataset(file2)
+        all_u, all_v = [], []
+        all_x, all_y = [], []
+        u_disc_ids, v_disc_ids = [], []
+
+        u_keys, v_keys = {}, {}
+        key_pairs = zip(dataset1.u_keys, dataset1.v_keys)
+        for (u, x, v, y), (u_key, v_key) in zip(dataset1, key_pairs):
+            all_u.append(u)
+            all_v.append(v)
+
+            if u_key not in u_keys:
+                u_keys[u_key] = len(all_x)
+                all_x.append(x)
+            u_disc_ids.append(u_keys[u_key])
+
+            if v_key not in v_keys:
+                v_keys[v_key] = len(all_y)
+                all_y.append(y)
+            v_disc_ids.append(v_keys[v_key])
+
+        u_keys, v_keys = {}, {}
+        key_pairs = zip(dataset2.u_keys, dataset2.v_keys)
+        for (u, x, v, y), (u_key, v_key) in zip(dataset2, key_pairs):
+            all_u.append(u)
+            all_v.append(v)
+
+            if u_key not in u_keys:
+                u_keys[u_key] = len(all_x)
+                all_x.append(x)
+            u_disc_ids.append(u_keys[u_key])
+
+            if v_key not in v_keys:
+                v_keys[v_key] = len(all_y)
+                all_y.append(y)
+            v_disc_ids.append(v_keys[v_key])
+
+        u_disc_ids = torch.tensor(u_disc_ids, dtype=torch.long)
+        v_disc_ids = torch.tensor(v_disc_ids, dtype=torch.long)
+
+        OLDataset.write(
+            output_file,
+            all_u, all_x,
+            all_v, all_y,
+            u_disc=u_disc_ids,
+            v_disc=v_disc_ids
+        )
