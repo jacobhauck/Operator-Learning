@@ -333,9 +333,9 @@ class OLDataset(torch.utils.data.Dataset):
         v_disc_ids = torch.tensor(v_disc_ids, dtype=torch.long)
 
         OLDataset.write(
-            output_file,
             all_u, all_x,
             all_v, all_y,
+            output_file,
             u_disc=u_disc_ids,
             v_disc=v_disc_ids
         )
