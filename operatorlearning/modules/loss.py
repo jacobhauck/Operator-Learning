@@ -220,13 +220,13 @@ class FunctionalTVLoss(torch.nn.Module):
         # (B, *shape, d_out, d_in)
 
         # Use Frobenius norm of Jacobian
-        j_diff = torch.sum(j_diff**2, dim=[-1, -2]) ** .5  # (B, *shape)
+        j_diff = torch.sum(j_diff.abs(), dim=[-1, -2])  # (B, *shape)
 
         if self.relative:
             j_target = self.differentiator(target, x)
             # (B, *shape, d_out, d_in)
 
-            magnitude = torch.sum(j_target**2, dim=[-1, -2]) ** .5  # (B, *shape)
+            magnitude = torch.sum(j_target.abs(), dim=[-1, -2])  # (B, *shape)
             if self.integrator is not None and x is not None:
                 i_magnitude = self.integrator(magnitude[..., None], x)[0]  # (B,)
             else:
