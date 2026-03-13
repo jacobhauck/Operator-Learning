@@ -350,7 +350,9 @@ class OLDataset(torch.utils.data.Dataset):
                 v_disc_ids.append(v_keys[v_key])
 
         for input_file in input_files:
-            dump(OLDataset(input_file))
+            input_dataset = OLDataset(input_file)
+            dump(input_dataset)
+            input_dataset.file.close()
 
         u_disc_ids = torch.tensor(u_disc_ids, dtype=torch.long)
         v_disc_ids = torch.tensor(v_disc_ids, dtype=torch.long)
