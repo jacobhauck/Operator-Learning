@@ -222,6 +222,9 @@ class OLDataset(torch.utils.data.Dataset):
                 all_y.append(y)
             v_disc_ids.append(v_keys[v_key])
 
+        u_disc_ids = torch.tensor(u_disc_ids, dtype=torch.long)
+        v_disc_ids = torch.tensor(v_disc_ids, dtype=torch.long)
+
         OLDataset.write(
             all_u, all_x,
             all_v, all_y,
