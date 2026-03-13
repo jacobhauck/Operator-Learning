@@ -191,6 +191,44 @@ class OLDataset(torch.utils.data.Dataset):
 
         return u, x, v, y
 
+    def save_subset(self, indices, output_file):
+        """
+        Saves a subset of this dataset as a new dataset
+
+        :param indices: list of integers giving the sample indices to save
+        :param output_file: Name of file in which to save subset
+        """
+        assert len(indices) > 0, 'Must provide non-empty subset'
+
+        all_u, all_v = [], []
+        all_x, all_y = [], []
+        u_disc_ids, v_disc_ids = [], []
+
+        u_keys, v_keys = {}, {}
+        for i in indices:
+            u, x, v, y = self[i]
+            u_key, v_key = self.u_keys[i], self.v_keys[i]
+
+            all_u.append(u)
+            all_v.append(v)
+
+            if u_key not in u_keys:
+                u_keys[u_key] = len(all_x)
+                all_x.append(x)
+            u_disc_ids.append(u_keys[u_key])
+
+            if v_key not in v_keys:
+                v_keys[v_key] = len(all_y)
+                all_y.append(y)
+            v_disc_ids.append(v_keys[v_key])
+
+        OLDataset.write(
+            all_u, all_x,
+            all_v, all_y,
+            output_file,
+            u_disc_ids, v_disc_ids
+        )
+
     @staticmethod
     def write(u, x, v, y, file_name, u_disc=None, v_disc=None):
         """
