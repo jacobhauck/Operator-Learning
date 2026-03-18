@@ -1,8 +1,9 @@
 import torch
+import numpy as np
 from math import floor
 
 
-class SplineGridIntegrator(torch.nn.Module):
+class UniformSplineGridIntegrator(torch.nn.Module):
     """
     Integrates using spline approximation on a uniform tensor grid.
 
@@ -216,4 +217,111 @@ class TrapezoidIntegrator(torch.nn.Module):
             w *= w_i[*broadcast_index]
 
         b, d_out = f.shape[0], f.shape[-1]
-        return torch.sum((w * f).view(b, -1, d_out), dim=1)  # (B, d_out)
+        return torch.sum((w * f).reshape(b, -1, d_out), dim=1)  # (B, d_out)
+
+
+class OpenSimpsonIntegrator(torch.nn.Module):
+    """
+    Integrates a function over a rectangular grid using tensor product of
+    composite Simpson's rule on the interior and a degree-3 spline at the
+    boundaries.
+
+    This requires the sampling points to be evenly spaced *within* the minimum
+    and maximum points, but not necessarily at the boundaries.
+    """
+    def __init__(self, x_min, x_max):
+        """
+        :param x_min: d-tuple giving minimum point of rectangular domain
+        :param x_max: d-tuple giving maximum point of rectangular domain
+        """
+        super().__init__()
+        self.x_min = torch.from_numpy(np.array(x_min)).to(torch.float)
+        self.x_max = torch.from_numpy(np.array(x_max)).to(torch.float)
+
+    def poly_weights(self, x, a, b):
+        """
+        :param x: (B, 3) or (B, 4), sampling points
+        :param a: (B) the lower bound of the interval of integration
+        :param b: (B) the upper bound of the interval of integration
+        :return: (B, 3) or (B, 4), the quadrature weights for fourth/fifth-order
+            quadrature on [a, b] using the given sampling points
+        """
+        if x.shape[1] == 3:  # Fourth-order rule
+            vandermonde = torch.stack([
+                torch.ones_like(x),
+                x - a[:, None],
+                (x - a[:, None]) ** 2
+            ], dim=1)
+            # (B, 3, 3)
+            integrals = torch.stack([b - a, (b - a) ** 2 / 2, (b - a) ** 3 / 3], dim=1)
+            # (B, 3)
+            w = torch.linalg.solve(vandermonde, integrals)  # (B, 3)
+        elif x.shape[1] == 4:  # Fifth-order rule
+            vandermonde = torch.stack([
+                torch.ones_like(x),
+                x - a[:, None],
+                (x - a[:, None]) ** 2,
+                (x - a[:, None]) ** 3
+            ], dim=1)
+            # (B, 4, 4)
+            integrals = torch.stack(
+                [b - a, (b-a) ** 2 / 2, (b-a) ** 3 / 3, (b-a)**4 / 4],
+                dim=1
+            )
+            # (B, 4)
+            w = torch.linalg.solve(vandermonde, integrals)  # (B, 4)
+        else:
+            raise NotImplementedError('coefficients only supports 4th and 5th order rules')
+
+        return w
+
+    def forward(self, f, x):
+        """
+        :param f: (B, *in_shape, d_out) function sample values
+        :param x: (B, *in_shape, d_in) Points at which function is sampled. Must
+            form a tensor grid (according to the conventions of GridFunction)
+        :return: (B, d_out) integral of f over the domain using the composite
+            Simpson's rule with 2nd- or 3rd-degree splines at the boundary
+        """
+        d_in = x.shape[-1]
+        assert len(x.shape) == 2 + d_in, 'x has wrong shape for tensor grid'
+
+        xs = []
+        extraction_tuple = [slice(None)] + [0] * d_in + [0]
+        for i in range(d_in):
+            if i > 0:
+                extraction_tuple[i] = 0
+            extraction_tuple[i + 1] = slice(None)
+            extraction_tuple[-1] = i
+            xs.append(x[*extraction_tuple].contiguous())
+        # list of d_in tensors of shape (B, in_shape[i])
+
+        w = torch.ones_like(x[..., 0:1])  # (B, *in_shape, 1)
+        for i, x_i in enumerate(xs):
+            assert x_i.shape[1] >= 5, 'Need at least 5 points in each direction'
+            w_i = torch.zeros_like(x_i)  # (B, in_shape[i])
+
+            # Left side
+            a_left = torch.tile(self.x_min[i: i + 1], x_i.shape[0:1])  # (B)
+            b_left = x_i[:, 2]  # (B)
+            w_i[:, :3] = self.poly_weights(x_i[:, :3], a_left, b_left)
+
+            # Right side
+            right_points = 3 + ((x_i.shape[1] - 5) % 2)
+            a_right = x_i[:, -right_points]
+            b_right = torch.tile(self.x_max[i: i + 1], x_i.shape[0:1])
+            w_i[:, -right_points:] += self.poly_weights(x_i[:, -right_points:], a_right, b_right)
+
+            # Interior
+            if x_i.shape[1] > 5:
+                dx_i = x_i[:, 3] - x_i[:, 2]
+                w_i[:, 3 : -right_points : 2] += 4/3 * dx_i[:, None]
+                w_i[:, 2 : -right_points + 1 : 2] += 2/3 * dx_i[:, None]
+                w_i[:, 2] -= dx_i / 3
+                w_i[:, -right_points] -= dx_i / 3
+
+            broadcast_index = [slice(None)] + [None] * i + [slice(None)] + [None] * (d_in - i)
+            w *= w_i[*broadcast_index]
+
+        b, d_out = f.shape[0], f.shape[-1]
+        return torch.sum((w * f).reshape(b, -1, d_out), dim=1)  # (B, d_out)

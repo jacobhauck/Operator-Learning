@@ -2,6 +2,6 @@ num_points: 256
 differentiator:
   name: ForwardEuler1dDifferentiator
 integrator:
-  name: SplineGridIntegrator
+  name: UniformSplineGridIntegrator
   n: 1
   mode: closed

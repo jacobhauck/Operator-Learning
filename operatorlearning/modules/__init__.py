@@ -13,7 +13,7 @@ from .pcanet import PCANet
 from .mfear import MFEAR
 from .integration import (
     TrapezoidIntegrator,
-    SplineGridIntegrator
+    UniformSplineGridIntegrator
 )
 from .differentiation import ForwardEuler1dDifferentiator
 from .loss import (
