@@ -156,6 +156,50 @@ class OLDataset(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.u_indices)
 
+    def get_x(self, disc_id):
+        if self.x is None:
+            if self.file is None:
+                self.file = h5py.File(self.file_name)
+
+            x = self.file['x'][self.x_keys[disc_id]][:].copy()
+            return torch.from_numpy(x)
+        else:
+            return self.x[disc_id]
+
+    def get_y(self, disc_id):
+        if self.y is None:
+            if self.file is None:
+                self.file = h5py.File(self.file_name)
+
+            y = self.file['y'][self.y_keys[disc_id]][:].copy()
+            return torch.from_numpy(y)
+        else:
+            return self.y[disc_id]
+
+    def get_u(self, index):
+        u_key, u_index = self.u_keys[index], self.u_indices[index]
+
+        if self.u is None:
+            if self.file is None:
+                self.file = h5py.File(self.file_name)
+
+            u = self.file['u'][u_key]['u'][u_index].copy()
+            return torch.from_numpy(u)
+        else:
+            return self.u[u_key][u_index]
+
+    def get_v(self, index):
+        v_key, v_index = self.v_keys[index], self.v_indices[index]
+
+        if self.v is None:
+            if self.file is None:
+                self.file = h5py.File(self.file_name)
+
+            v = self.file['v'][v_key]['v'][v_index].copy()
+            return torch.from_numpy(v)
+        else:
+            return self.v[v_key][v_index]
+
     def __getitem__(self, index):
         u_key, u_index = self.u_keys[index], self.u_indices[index]
         v_key, v_index = self.v_keys[index], self.v_indices[index]
@@ -190,6 +234,74 @@ class OLDataset(torch.utils.data.Dataset):
             v = self.v[v_key][v_index]
 
         return u, x, v, y
+
+    def save_subsampled(self, x_indices, y_indices, output_file):
+        """
+        Subsamples this dataset and saves the result as a new dataset.
+
+        :param x_indices: dictionary of (*shape, k) tensors giving subsampling
+            indices into x, where the keys are the discretization IDs. The shape
+            *shape is arbitrary, but k must be the number of components of the
+            leading shape of the corresponding x array. If the original x array
+            has shape (n_1, ..., n_k, u_d_in), then the subsampled array will
+            have shape (*shape, u_d_in), obtained by the indexing formula
+            x_new = x[x_indices[..., 0], x_indices[..., 1], ..., x_indices[..., k-1], :].
+            If only one discretization is used in this dataset, then x_indices
+            can just be a (*shape, k) tensor of subsampling indices for that one
+            discretization.
+        :param y_indices: Same as x_indices, but for subsampling y coordinates
+        :param output_file: Name of file to write subsampled dataset to
+        """
+        if not isinstance(x_indices, dict):
+            assert len(self.x_keys) == 1, \
+                'Must provide subsampling indices for ALL x discretizations'
+            x_indices = {next(iter(self.u_disc_ids.values())): x_indices}
+
+        if not isinstance(y_indices, dict):
+            assert len(self.y_keys) == 1, \
+                'Must provide subsampling indices for ALL y discretizations'
+            y_indices = {next(iter(self.v_disc_ids.values())): y_indices}
+
+        # Subsample coordinate arrays
+        all_x, all_y = [], []
+        x_slices = {}
+        for u_disc_id in self.u_disc_ids.values():
+            x = self.get_x(u_disc_id)
+            index = x_indices[u_disc_id]
+            fancy_index = tuple(index[..., i] for i in range(len(x.shape) - 1))
+            x_slices[u_disc_id] = fancy_index
+            all_x.append(x[*fancy_index, :])
+
+        y_slices = {}
+        for v_disc_id in self.v_disc_ids.values():
+            y = self.get_y(v_disc_id)
+            index = y_indices[v_disc_id]
+            fancy_index = tuple(index[..., i] for i in range(len(y.shape) - 1))
+            y_slices[v_disc_id] = fancy_index
+            all_y.append(y[*fancy_index, :])
+
+        # Subsample data arrays
+        all_u, all_v = [], []
+        u_disc_ids, v_disc_ids = [], []
+        for i in range(len(self)):
+            u, v = self.get_u(i), self.get_v(i)
+            u_disc_id = self.u_disc_ids[self.u_keys[i]]
+            v_disc_id = self.v_disc_ids[self.v_keys[i]]
+            u_disc_ids.append(u_disc_id)
+            v_disc_ids.append(v_disc_id)
+            all_u.append(u[*x_slices[u_disc_id], :])
+            all_v.append(v[*y_slices[v_disc_id], :])
+
+        u_disc_ids = torch.tensor(u_disc_ids, dtype=torch.long)
+        v_disc_ids = torch.tensor(v_disc_ids, dtype=torch.long)
+
+        OLDataset.write(
+            all_u, all_x,
+            all_v, all_y,
+            output_file,
+            u_disc=u_disc_ids,
+            v_disc=v_disc_ids
+        )
 
     def save_subset(self, indices, output_file):
         """
