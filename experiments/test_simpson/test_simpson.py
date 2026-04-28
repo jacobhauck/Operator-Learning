@@ -17,7 +17,6 @@ class TestSimpsonExperiment(mlx.Experiment):
             f = torch.cos(3*x)
             return f, x
 
-
         def true_simpson(n):
             dx = 1 / (n - 1)
             w = torch.full((n,), dx * 2/3)
