@@ -164,6 +164,12 @@ class FullFourierBasis2d(OrthonormalBasis, torch.nn.Module):
     def volume(self):
         return (self.x_max[0] - self.x_min[0]) * (self.x_max[1] - self.x_min[1])
 
+    def kx(self):
+        return torch.cat([self.akx, self.bkx, self.ckx, self.dkx])
+
+    def ky(self):
+        return torch.cat([self.aky, self.bky, self.cky, self.dky])
+
     def inner_product(self, u1, u2, x, integrator=None):
         """
         Computes the L^2 (on the box from x_min to x_max) inner product between
