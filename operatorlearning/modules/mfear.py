@@ -4,6 +4,9 @@ Implementation of our multifidelity encode-approximate-reconstruct model (MFEAR)
 import torch
 import mlx
 
+# Import TrapezoidIntegrator for legacy use
+from operatorlearning.modules.integration import TrapezoidIntegrator
+
 
 class CompactMLPBasis(torch.nn.Module):
     def __init__(self, mlp, p, d_in, d_out, feat_expansion=None):
@@ -35,7 +38,7 @@ class CompactMLPBasis(torch.nn.Module):
     def forward(self, x):
         """
         :param x: (B, *shape, d_in) Points at which to compute the basis
-        :return: (b, *shape, p, d_out) Basis functions evaluated at x
+        :return: (B, *shape, p, d_out) Basis functions evaluated at x
         """
         if self.feat_expansion is not None:
             x = self.feat_expansion(x)  # (B, *shape, num_features)
