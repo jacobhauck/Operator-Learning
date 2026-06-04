@@ -47,6 +47,45 @@ class CompactMLPBasis(torch.nn.Module):
         return packed.reshape(*packed.shape[:-1], self.p, self.d_out)
 
 
+class StackedMLPBasis(torch.nn.Module):
+    def __init__(self, mlp, p, d_in, d_out, feat_expansion=None):
+        """
+        :param mlp: Config of underlying MLP (per basis function)
+        :param p: Number of basis functions
+        :param d_in: Input dimension
+        :param d_out: Output dimension
+        :param feat_expansion: Optional config for a feature
+            expansion module. Should map (B, *shape, d_in)
+            to (B, *shape, feat_expansion.num_features)
+        """
+        super().__init__()
+        self.p = p
+        self.d_in = d_in
+        self.d_out = d_out
+
+        if feat_expansion is not None:
+            self.feat_expansion = mlx.create_module(feat_expansion)
+        else:
+            self.feat_expansion = None
+
+        mlp = dict(mlp)
+        mlp['name'] = 'StackedMLP'
+        mlp['d_in'] = d_in if self.feat_expansion is None else self.feat_expansion.num_features
+        mlp['d_out'] = d_out
+        mlp['num_units'] = p
+        self.mlp = mlx.create_module(mlp)
+
+    def forward(self, x):
+        """
+        :param x: (B, *shape, d_in) Points at which to compute the basis
+        :return: (B, *shape, p, d_out) Basis functions evaluated at x
+        """
+        if self.feat_expansion is not None:
+            x = self.feat_expansion(x)  # (B, *shape, num_features)
+
+        return self.mlp(x)  # (B, *shape, p, d_out)
+
+
 class MFEAR(torch.nn.Module):
     def __init__(
             self,
