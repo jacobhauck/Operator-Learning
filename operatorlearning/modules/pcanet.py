@@ -3,7 +3,7 @@ import torch
 import operatorlearning as ol
 
 
-def pca_basis(dataset, x, num_modes, mean=None):
+def pca_basis(dataset, x, num_modes, mean=None, return_singular=False):
     """
     Calculate a PCA basis (mean + basis functions) on a fixed set of
     sampling points
@@ -14,6 +14,8 @@ def pca_basis(dataset, x, num_modes, mean=None):
     :param num_modes: Number of PCA modes to keep
     :param mean: Optional (*shape, d_out) Sample values of a mean function
         to force the PCA to use instead of the calculated mean
+    :param return_singular: Whether to return singular values (as tensor of
+        shape (r,), where r = min(m, D), D = prod(shape) * d_out). Default = False
     :return: Tuple mean, basis. mean (*shape, d_out) is the mean function of
         the dataset, and basis (num_modes, *shape, d_out), the samples of the
         PCA basis functions
@@ -38,8 +40,8 @@ def pca_basis(dataset, x, num_modes, mean=None):
     assert min(centered.shape) >= num_modes, \
         'Data cannot provide requested number of modes'
 
-    _, _, vt = torch.linalg.svd(centered, full_matrices=False)
-    # (n, r), (r, r), (r, D), r = min(n, D)
+    _, s, vt = torch.linalg.svd(centered, full_matrices=False)
+    # (n, r), (r,), (r, D), r = min(n, D)
 
     basis = vt[:num_modes].reshape(num_modes, *mean.shape)
     # (num_modes, *shape, d_out)
@@ -56,7 +58,10 @@ def pca_basis(dataset, x, num_modes, mean=None):
     # we should get 1 for all basis functions.
     basis *= ((torch.prod(torch.tensor(mean.shape[:-1]))) ** .5).item()
 
-    return mean, basis
+    if return_singular:
+        return mean, basis, s
+    else:
+        return mean, basis
 
 
 class PCANet(torch.nn.Module):
@@ -108,12 +113,14 @@ class PCANet(torch.nn.Module):
         if not isinstance(v_dataset[0], ol.Function):
             v_dataset = torch.stack(v_dataset)
 
-        u_mean, u_basis = pca_basis(u_dataset, x, self.u_num_modes)
-        v_mean, v_basis = pca_basis(v_dataset, y, self.v_num_modes)
+        u_mean, u_basis, u_sing = pca_basis(u_dataset, x, self.u_num_modes, return_singular=True)
+        v_mean, v_basis, v_sing = pca_basis(v_dataset, y, self.v_num_modes, return_singular=True)
         self.u_mean[:] = u_mean
         self.u_basis[:] = u_basis
+        self.register_buffer('u_singular_values', u_sing)
         self.v_mean[:] = v_mean
         self.v_basis[:] = v_basis
+        self.register_buffer('v_singular_values', v_sing)
     
     def forward(self, u):
         """
@@ -152,7 +159,12 @@ class PCANet(torch.nn.Module):
         :return: (B, *input_shape, u_d_out) Input function sampled on the
             same points used for the input PCA basis
         """
-        u = torch.einsum('BN,N...d->B...d', u_proj, self.u_basis)
+        if u_proj.shape[1] != self.u_basis.shape[0]:
+            u_basis = self.u_basis[:u_proj.shape[1]]
+        else:
+            u_basis = self.u_basis
+
+        u = torch.einsum('BN,N...d->B...d', u_proj, u_basis)
         # (B, *output_shape, u_d_out)
 
         return u + self.u_mean[None]
@@ -164,7 +176,12 @@ class PCANet(torch.nn.Module):
         :return: (B, *output_shape, v_d_out) Output function sampled on the
             same points used for the output PCA basis
         """
-        v = torch.einsum('BN,N...d->B...d', v_proj, self.v_basis)
+        if v_proj.shape[1] != self.v_basis.shape[0]:
+            v_basis = self.v_basis[:v_proj.shape[1]]
+        else:
+            v_basis = self.v_basis
+
+        v = torch.einsum('BN,N...d->B...d', v_proj, v_basis)
         # (B, *output_shape, v_d_out)
 
         return v + self.v_mean[None]
