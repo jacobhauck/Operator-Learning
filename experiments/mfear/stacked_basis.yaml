@@ -3,27 +3,29 @@ model:
   integrator:
     name: operatorlearning.modules.mfear.TrapezoidIntegrator
   encoder_net:
-    name: operatorlearning.modules.mfear.CompactMLPBasis
+    name: operatorlearning.modules.mfear.StackedMLPBasis
     d_in: 2
     d_out: 1
-    p: &p 12
+    p: &p 16
     mlp:
       hidden_layers:
-        - 64
-        - 64
-        - 64
+        - 8
+        - 8
+        - 8
+      num_units: 8
       activation:
         name: ReLU
   reconstructor_net:
-    name: operatorlearning.modules.mfear.CompactMLPBasis
+    name: operatorlearning.modules.mfear.StackedMLPBasis
     d_in: 2
     d_out: 1
     p: &q 24
     mlp:
       hidden_layers:
-        - 64
-        - 64
-        - 64
+        - 8
+        - 8
+        - 8
+      num_units: 8
       activation:
         name: ReLU
   approximator_net:
@@ -34,15 +36,3 @@ model:
       - 64
     activation:
       name: ReLU
-
-optim:
-  name: Adam
-  lr: 0.0001
-
-training:
-  dataset_size: 500
-  batch_size: 4
-  epochs: 100
-
-testing:
-  dataset_size: 100

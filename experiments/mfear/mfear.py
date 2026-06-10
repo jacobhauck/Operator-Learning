@@ -11,7 +11,7 @@ class MFEARPoissonTrainer(BasePoissonTrainer):
 
 class MFEARDemoExperiment(mlx.WandBExperiment):
     def wandb_run(self, config, run):
-        trainer = MFEARPoissonTrainer(config, run)
+        trainer = MFEARPoissonTrainer(config, run, log_interval=3.0)
         trainer.train(config['training']['epochs'])
         losses, _ = trainer.evaluate(datasets=('train', 'test'))
 

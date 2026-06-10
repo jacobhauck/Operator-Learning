@@ -68,6 +68,8 @@ class StackedMLPBasis(torch.nn.Module):
         if num_units is None:
             num_units = p
 
+        assert p % num_units == 0, 'num_units must divide p'
+
         if feat_expansion is not None:
             self.feat_expansion = mlx.create_module(feat_expansion)
         else:
@@ -76,7 +78,7 @@ class StackedMLPBasis(torch.nn.Module):
         mlp = dict(mlp)
         mlp['name'] = 'StackedMLP'
         mlp['d_in'] = d_in if self.feat_expansion is None else self.feat_expansion.num_features
-        mlp['d_out'] = d_out
+        mlp['d_out'] = d_out * (p // num_units)
         mlp['num_units'] = num_units
         self.mlp = mlx.create_module(mlp)
 
@@ -88,7 +90,9 @@ class StackedMLPBasis(torch.nn.Module):
         if self.feat_expansion is not None:
             x = self.feat_expansion(x)  # (B, *shape, num_features)
 
-        return self.mlp(x)  # (B, *shape, p, d_out)
+        packed = self.mlp(x)  # (B, *shape, num_units, d_out*p/num_units)
+        return packed.reshape(*packed.shape[:-2], self.p, self.d_out)
+        # (B, *shape, p, d_out)
 
 
 class MFEAR(torch.nn.Module):
