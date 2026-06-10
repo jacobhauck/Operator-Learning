@@ -68,7 +68,7 @@ class StackedMLPBasis(torch.nn.Module):
         if num_units is None:
             num_units = p
 
-        if feat_expansion is not Nonswswse:
+        if feat_expansion is not None:
             self.feat_expansion = mlx.create_module(feat_expansion)
         else:
             self.feat_expansion = None
