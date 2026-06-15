@@ -95,7 +95,7 @@ class UniformSplineGridIntegrator(torch.nn.Module):
         :param num_reps: Number of times to repeat the base rule
         :return: composite_weights ((n + 1) * num_reps) composite weights
         """
-        return torch.tile(base_weights, (num_reps + 1,))  # easy
+        return torch.tile(base_weights, (num_reps,))  # easy
 
     def num_reps(self, size):
         """
@@ -123,7 +123,7 @@ class UniformSplineGridIntegrator(torch.nn.Module):
         in_shape = x.shape[1:-1]
         c = self.coefficients(self.n, self.mode, device=x.device, dtype=x.dtype)
 
-        w = torch.ones_like(x[..., 0:1])  # (1, *in_shape, 1)
+        w = torch.ones_like(x[..., 0:1])  # (B, *in_shape, 1)
         for i in range(d_in):
             cur_i = (0,) * d_in
             next_i = [0] * d_in
