@@ -1,0 +1,6 @@
+integrator:
+  name: integration.UniformSplineGridIntegrator
+  n: 4
+  mode: open
+
+resolution: 30

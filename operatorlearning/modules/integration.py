@@ -3,6 +3,186 @@ import numpy as np
 from math import floor
 
 
+class SplineGridIntegrator(torch.nn.Module):
+    """
+    Integrates using a spline approximation on an arbitrary tensor grid.
+
+    Unlike UniformSplineGridIntegrator, this integrator guarantees order
+    of accuracy independent of number of quadrature points by fitting a
+    polynomial of degree between n and 2n to one sub-interval so that the proper
+    number of points are available for the remaining sub-intervals to be
+    interpolated by an integer number of polynomial pieces of degree n.
+    """
+    def __init__(self, n, x_min, x_max, lazy=False):
+        """
+        :param n: Degree of spline approximation
+        :param x_min: List of coordinates of domain lower bound
+        :param x_max: List of coordinates of domain upper bound
+        :param lazy: Whether to use lazy initialization for weights or
+            recalculate weights for every input (recalculating is very slow)
+        """
+        super().__init__()
+        self.n = n
+        self.lazy = lazy
+        self.register_buffer('x_min', torch.tensor(x_min))
+        self.register_buffer('x_max', torch.tensor(x_max))
+        self.weights = None
+
+    def forward(self, f, x):
+        """
+        :param f: (B, *in_shape, d_out) function sample values
+        :param x: (B, *in_shape, d_in) Points at which function is sampled. Must
+            form a tensor grid (according to the conventions of GridFunction)
+        :return: (B, d_out) integral of f over the domain
+        """
+        if self.weights is None and self.lazy:
+            self.recalculate_weights(x[0:1])
+            # self.weights shape is (1, *in_shape, 1)
+        elif not self.lazy:
+            self.recalculate_weights(x)
+            # self.weights shape is (B, *in_shape, 1)
+
+        b, *_, d_out = f.shape
+        return (self.weights * f).reshape(b, -1, d_out).sum(dim=1)
+
+    @staticmethod
+    def poly_weights(x, x_left, x_right):
+        """
+        Gets quadrature weights for integrating over the given interval with the
+        given nodes using polynomial interpolation at the given nodes
+        :param x: (B, n+1) Batch of nodes
+        :param x_left: (B) Batch of left interval sides
+        :param x_right: (B) Batch of right interval sides
+        :return: weights (B, n + 1)
+        """
+        k = torch.arange(x.shape[1])  # (n+1)
+        mat = (x - x_left[:, None])[:, None, :] ** k[None, :, None]
+        # (B, n+1, n+1)
+        rhs = (x_right - x_left)[:, None] ** (k[None] + 1) / (k[None] + 1)
+        # (B, n+1)
+        return torch.linalg.solve(mat, rhs)  # (B, n+1)
+
+    def get_weights_interior(self, x):
+        """
+        Get quadrature weights for interior subintervals
+        :param x: Sampling points (B, size)
+        :return: weights (B, size)
+        """
+        weights = torch.zeros_like(x)
+        for i in range(0, x.shape[1] - 1, self.n):
+            weights[:, i : i + self.n + 1] += self.poly_weights(
+                x[:, i : i + self.n + 1],
+                x[:, i],
+                x[:, i + self.n]
+            )
+        return weights
+
+    def get_weights_left(self, x, i):
+        """
+        Get quadrature weights for left-most subinterval along given axis only
+        :param x: Sampling points (B, n + 1)
+        :param i: index of axis
+        :return: weights (B, n + 1)
+        """
+        x_min = torch.tile(self.x_min[None, i], dims=(x.shape[0],))  # (B)
+        return self.poly_weights(x, x_min, x[:, -1])
+
+    def get_weights_right(self, x, i):
+        """
+        Get quadrature weights for right-most subinterval along given axis only
+        :param x: Sampling points (B, n + 1)
+        :param i: index of axis
+        :return: weights (B, n + 1)
+        """
+        x_max = torch.tile(self.x_max[None, i], dims=(x.shape[0],))  # (B)
+        return self.poly_weights(x, x[:, 0], x_max)
+
+    def get_weights_left_right(self, x, i):
+        """
+        Get quadrature weights for entire interval along given axis
+        :param x: Sampling points (B, n + 1)
+        :param i: index of axis
+        :return: weights (B, n + 1)
+        """
+        x_min = torch.tile(self.x_min[None, i], dims=(x.shape[0],))  # (B)
+        x_max = torch.tile(self.x_max[None, i], dims=(x.shape[0],))  # (B)
+        return self.poly_weights(x, x_min, x_max)
+
+    def recalculate_weights(self, x):
+        """
+        Recalculates quadrature weights for the given tensor grid and stores
+        them in self.weights
+        :param x: (B, *in_shape, d_in) The tensor grid
+        """
+        d_in = x.shape[-1]
+        assert len(x.shape) == 2 + d_in, 'x has wrong shape for tensor grid'
+
+        in_shape = x.shape[1:-1]
+        w = torch.ones_like(x[..., 0:1])  # (B, *in_shape, 1)
+        for i in range(d_in):
+            w_i = torch.zeros((x.shape[0], in_shape[i]), device=x.device, dtype=x.dtype)
+            # (B, in_shape[i])
+
+            n_l, n_i, n_r = self.num_reps(in_shape[i])
+
+            if n_l == 0 and n_r == 0:
+                sl_all = (0,) * i + (slice(None),) + (0,) * (d_in-i-1)
+                x_all = x[:, *sl_all, i]  # (B, n_i)
+                w_i = self.get_weights_left_right(x_all, i)
+            else:
+                sl_l = (0,) * i + (slice(n_l),) + (0,) * (d_in-i-1)
+                x_l = x[:, *sl_l, i]  # (B, n_l)
+                w_i[:, :n_l] = self.get_weights_left(x_l, i)
+                cur = n_l - 1
+
+                if n_i > 0:
+                    sl_i = (0,) * i + (slice(cur, cur + n_i),) + (0,) * (d_in-i-1)
+                    x_i = x[:, *sl_i, i]  # (B, n_i)
+                    w_i[:, cur : cur + n_i] += self.get_weights_interior(x_i)
+                    cur += n_i - 1
+
+                sl_r = (0,) * i + (slice(cur, cur + n_r),) + (0,) * (d_in-i-1)
+                x_r = x[:, *sl_r, i]  # (B, n_r)
+                w_i[:, cur:] += self.get_weights_right(x_r, i)
+
+            broadcast_index = [slice(None)] + [None] * i + [slice(None)] + [None] * (d_in - i)
+            w *= w_i[*broadcast_index]
+
+        self.weights = w
+
+    def num_reps(self, size):
+        d = (size - 1) // self.n
+        r = size - (d * self.n + 1)
+        if r > 0:
+            if d == 0:
+                left = 0
+                interior = r + 1
+                right = 0
+            elif d == 1:
+                left = self.n + 1
+                interior = 0
+                right = r + 1
+            else:
+                left = self.n + 1
+                interior = (d - 1) * self.n + 1
+                right = r + 1
+        else:
+            if d == 1:
+                left = 0
+                interior = self.n + 1
+                right = 0
+            elif d == 2:
+                left = self.n + 1
+                interior = 0
+                right = self.n + 1
+            else:
+                left = self.n + 1
+                interior = (d - 2) * self.n + 1
+                right = self.n + 1
+
+        return left, interior, right
+
+
 class UniformSplineGridIntegrator(torch.nn.Module):
     """
     Integrates using spline approximation on a uniform tensor grid.
@@ -18,6 +198,11 @@ class UniformSplineGridIntegrator(torch.nn.Module):
     h/2 from the first interior points, which are subsequently spaced by h. In
     standard open Newton-Cotes formulas, the first interior point and endpoint
     are separated by a distance h, the same as all subsequent points.
+
+    Note that order of accuracy may be lost if the number of quadrature points
+    cannot be covered with an integer number of spline pieces. In this case a
+    lower-order spline is used to integrate over the subinterval with the
+    remaining points.
     """
 
     def __init__(self, n, mode='closed'):
