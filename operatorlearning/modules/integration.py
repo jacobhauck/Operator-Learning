@@ -55,7 +55,7 @@ class SplineGridIntegrator(torch.nn.Module):
         :param x_right: (B) Batch of right interval sides
         :return: weights (B, n + 1)
         """
-        k = torch.arange(x.shape[1])  # (n+1)
+        k = torch.arange(x.shape[1], dtype=x.dtype, device=x.device)  # (n+1)
         mat = (x - x_left[:, None])[:, None, :] ** k[None, :, None]
         # (B, n+1, n+1)
         rhs = (x_right - x_left)[:, None] ** (k[None] + 1) / (k[None] + 1)
