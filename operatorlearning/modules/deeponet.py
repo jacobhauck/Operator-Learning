@@ -264,7 +264,7 @@ class FourierFeatureExpansion(torch.nn.Module):
         else:
             self.register_buffer('k', k)
 
-        self.num_features = 2 * self.k.shape[0]
+        self.num_features = 2 * self.k.shape[0] + self.dim
 
     def forward(self, y):
         """
@@ -278,9 +278,9 @@ class FourierFeatureExpansion(torch.nn.Module):
             'Wrong input feature dimension for Fourier feature expansion'
 
         angle = torch.einsum('...d,nd->...n', y, self.k)
-        # (*out_shape, num_features/2)
+        # (*out_shape, num_features/2 - 1)
 
         sin = torch.sin(angle)
         cos = torch.cos(angle)
 
-        return torch.cat([sin, cos], dim=-1)  # (*out_shape, num_features)
+        return torch.cat([y, sin, cos], dim=-1)  # (*out_shape, num_features)
