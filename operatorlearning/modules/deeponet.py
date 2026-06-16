@@ -220,7 +220,8 @@ class FourierFeatureExpansion(torch.nn.Module):
             scale,
             features: int,
             mode: str = 'full',
-            learnable: bool = False
+            learnable: bool = False,
+            include_raw: bool = False
     ):
         """
         :param origin: Origin of Fourier features, list of coordinates
@@ -237,6 +238,8 @@ class FourierFeatureExpansion(torch.nn.Module):
             [3, ..., 3] and uncorrelated components
         :param learnable: If True, then the wave numbers will be learnable
             parameters (regardless of what value of mode is given)
+        :param include_raw: Whether to include the raw coordinates as part of
+            the expanded features. Default = False
         """
         super().__init__()
         self.register_buffer('origin', torch.tensor(origin, dtype=torch.float))
@@ -264,7 +267,8 @@ class FourierFeatureExpansion(torch.nn.Module):
         else:
             self.register_buffer('k', k)
 
-        self.num_features = 2 * self.k.shape[0] + self.dim
+        self.include_raw = include_raw
+        self.num_features = 2 * self.k.shape[0] + (self.dim if include_raw else 0)
 
     def forward(self, y):
         """
@@ -278,9 +282,12 @@ class FourierFeatureExpansion(torch.nn.Module):
             'Wrong input feature dimension for Fourier feature expansion'
 
         angle = torch.einsum('...d,nd->...n', y, self.k)
-        # (*out_shape, (num_features - d)/2)
+        # (*out_shape, (num_features - d)/2) or (*shape, num_features/2)
 
         sin = torch.sin(angle)
         cos = torch.cos(angle)
 
-        return torch.cat([y, sin, cos], dim=-1)  # (*out_shape, num_features)
+        if self.include_raw:
+            return torch.cat([y, sin, cos], dim=-1)  # (*out_shape, num_features)
+        else:
+            return torch.cat([sin, cos], dim=-1)  # (*out_shape, num_features)
