@@ -105,11 +105,11 @@ class DeepONet(torch.nn.Module):
 
             return scaled + self.bias.view(*([1] * (len(scaled.shape)-1)), -1)
 
-    def forward(self, u, x_out, return_functions=False):
+    def forward(self, u, y, return_functions=False):
         """
         :param u: (B, *in_shape, u_d_out) sample values of a batch of input
             functions
-        :param x_out: (B, *out_shape, v_d_in) coordinates of points at which
+        :param y: (B, *out_shape, v_d_in) coordinates of points at which
             to sample the output function.
         :param return_functions: Whether the output should be returned as
             a list of Functions. Note that this detaches branch values, so
@@ -120,18 +120,18 @@ class DeepONet(torch.nn.Module):
 
         if return_functions:
             return [
-                DeepONetOutputFunction(self, x_out[b], branch_vals[b])
-                for b in range(len(x_out))
+                DeepONetOutputFunction(self, y[b], branch_vals[b])
+                for b in range(len(y))
             ]
 
-        trunk_vals = self.trunk_net(x_out)  # (B, *out_shape, p, v_d_out)
+        trunk_vals = self.trunk_net(y)  # (B, *out_shape, p, v_d_out)
 
         pre_scaled = torch.einsum('bp,b...po->b...o', branch_vals, trunk_vals)
         # (B, *out_shape, v_d_out)
 
         scaled = self.scale_output(pre_scaled, branch_vals.shape[1])
 
-        return self.add_bias(scaled, x_out)
+        return self.add_bias(scaled, y)
 
 
 class MLPBranchNet(torch.nn.Module):
