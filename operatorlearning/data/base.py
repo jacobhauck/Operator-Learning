@@ -1,3 +1,4 @@
+import mlx
 import torch
 import torch.utils.data
 import numpy as np
@@ -479,3 +480,7 @@ class OLDataset(torch.utils.data.Dataset):
             u_disc=u_disc_ids,
             v_disc=v_disc_ids
         )
+
+class OLDatasetLibrary(mlx.DatasetLibrary):
+    def __init__(self, name):
+        super().__init__(name, 'ol.h5')
