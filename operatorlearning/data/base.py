@@ -3,6 +3,7 @@ import torch
 import torch.utils.data
 import numpy as np
 import h5py
+import os
 
 
 class SameRepresentationBatchSampler:
@@ -66,7 +67,7 @@ class OLDataset(torch.utils.data.Dataset):
         self.x_keys = {}
         x_group = file['x']
         for key in x_group.keys():
-            x_id = int(x_group[key].attrs['id'])
+            x_id = int(x_group[key].attrs['id'].item())
             self.x_keys[x_id] = key
             if not stream_xy:
                 self.x[x_id] = torch.from_numpy(x_group[key][()])
@@ -76,7 +77,7 @@ class OLDataset(torch.utils.data.Dataset):
         self.y_keys = {}
         y_group = file['y']
         for key in y_group.keys():
-            y_id = int(y_group[key].attrs['id'])
+            y_id = int(y_group[key].attrs['id'].item())
             self.y_keys[y_id] = key
             if not stream_xy:
                 self.y[y_id] = torch.from_numpy(y_group[key][()])
@@ -89,7 +90,7 @@ class OLDataset(torch.utils.data.Dataset):
         u_indices_rel = []
         u_group = file['u']
         for key in u_group.keys():
-            self.u_disc_ids[key] = int(u_group[key].attrs['disc_id'])
+            self.u_disc_ids[key] = int(u_group[key].attrs['disc_id'].item())
             u_subgroup = u_group[key]
             indices = torch.from_numpy(u_subgroup['indices'][()])
             u_indices.append(indices)
@@ -111,7 +112,7 @@ class OLDataset(torch.utils.data.Dataset):
         v_indices_rel = []
         v_group = file['v']
         for key in v_group.keys():
-            self.v_disc_ids[key] = int(v_group[key].attrs['disc_id'])
+            self.v_disc_ids[key] = int(v_group[key].attrs['disc_id'].item())
             v_subgroup = v_group[key]
             indices = torch.from_numpy(v_subgroup['indices'][()])
             v_indices.append(indices)
@@ -484,3 +485,10 @@ class OLDataset(torch.utils.data.Dataset):
 class OLDatasetLibrary(mlx.DatasetLibrary):
     def __init__(self, name):
         super().__init__(name, 'ol.h5')
+    
+    def dataset_path(self, split, dataset_id, resolution=None):
+        if resolution is None:
+            return os.path.join(self.root, f'{split}-{dataset_id}.{self.ext}')
+        else:
+            return os.path.join(self.root, f'{split}-{dataset_id}@{resolution}.{self.ext}')
+
