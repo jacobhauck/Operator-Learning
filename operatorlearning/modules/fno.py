@@ -1,7 +1,6 @@
 import mlx
 import torch
 import neuralop.models
-from typing import Mapping
 
 
 class FNO(torch.nn.Module):
@@ -43,6 +42,11 @@ class FNO(torch.nn.Module):
         )
 
         self._fno = neuralop.models.FNO(**fno_args)
+
+    def load_state_dict(self, state_dict, strict=True, assign=False):
+        if '_metadata' in state_dict:
+            state_dict.pop('_metadata')
+        super().load_state_dict(state_dict, strict=strict, assign=assign)
 
     def forward(self, u):
         """
