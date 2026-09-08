@@ -1,6 +1,7 @@
 import mlx
 import torch
 import neuralop.models
+from typing import Mapping
 
 
 class FNO(torch.nn.Module):
