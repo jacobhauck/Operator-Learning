@@ -492,10 +492,9 @@ class OLDatasetLibrary(mlx.DatasetLibrary):
         else:
             return os.path.join(self.root, f'{split}-{dataset_id}@{resolution}.{self.ext}')
 
-    @staticmethod
-    def parse_path(path):
+    def parse_path(self, path):
         path = os.path.split(path)[1]
-        path = os.path.splitext(path)[0]
+        path = path[:len(self.ext) + 1]
         if '@' in path:
             path, resolution = path.split('@')
             resolution = int(resolution)
