@@ -494,7 +494,7 @@ class OLDatasetLibrary(mlx.DatasetLibrary):
 
     def parse_path(self, path):
         path = os.path.split(path)[1]
-        path = path[:len(self.ext) + 1]
+        path = path[:-len(self.ext) - 1]
         if '@' in path:
             path, resolution = path.split('@')
             resolution = int(resolution)
