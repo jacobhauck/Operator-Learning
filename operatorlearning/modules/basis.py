@@ -102,7 +102,6 @@ class FullFourierBasis2d(OrthonormalBasis, torch.nn.Module):
 
         scale = self.volume ** .5
 
-        # (num_modes^2)
         n_all = torch.full(self.g_x.shape, scale / 2, device=self.g_x.device)
         # (num_modes^2)
         n_cos = torch.cat([
