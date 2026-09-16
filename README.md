@@ -115,7 +115,7 @@ The demo experiments are implemented using my machine learning experiment librar
 [mlx](https://github.com/jacobhauck/ML-Template). Thus, to run the main demo for,
 say, DeepONet, you simply use the command
 ```commandline
-python -m mlx.run deeponet poisson
+mlx deeponet poisson
 ```
 from the project directory. This runs the `deeponet` experiment found in the
 `experiments` directory using the global configuration options defined in
