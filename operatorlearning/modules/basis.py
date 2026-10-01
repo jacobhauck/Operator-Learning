@@ -80,6 +80,126 @@ class OrthonormalBasis(Basis, ABC):
         return c.reshape(u.shape[0], -1)  # (B, dimension)
 
 
+class FullFourierBasis1d(OrthonormalBasis, torch.nn.Module):
+    def __init__(self, num_modes, x_min, x_max):
+        """
+        :param num_modes: Number of Fourier modes (of each type)
+        :param x_min: Lower bound of interval
+        :param x_max: Upper bound of interval
+        """
+        torch.nn.Module.__init__(self)
+        self.num_modes = num_modes
+        self.x_min = x_min
+        self.x_max = x_max
+
+        scale = self.length**.5
+        g_sin, g_cos = torch.arange(1, num_modes + 1), torch.arange(num_modes + 1)
+        n_cos = torch.cat([
+            torch.tensor([scale], device=g_cos.device),
+            torch.full(g_sin.shape, scale/2**.5, device=g_cos.device)
+        ])
+        n_sin = torch.full(g_sin.shape, scale/2**.5, device=g_cos.device)
+
+        self.register_buffer('ak', (2*torch.pi) * g_cos)
+        self.register_buffer('a_n', n_cos)
+        self.register_buffer('bk', (2*torch.pi) * g_sin)
+        self.register_buffer('b_n', n_sin)
+
+    @property
+    def dimension(self):
+        return len(self.ak) + len(self.bk)
+
+    @property
+    def length(self):
+        return self.x_max - self.x_min
+
+    def k(self):
+        return torch.cat([self.ak, self.bk])
+
+    def inner_product(self, u1, u2, x, integrator=None):
+        """
+        Computes the L^2 (on the box from x_min to x_max) inner product between
+        two functions.
+        :param u1: (B, *shape, 1) First input function values
+        :param u2: (B, *shape, 1) Second input function values
+        :param x: (B, *shape, 1) points at which both functions are sampled
+        :param integrator: optional module to use for integration
+        :return: (B) inner product of u1 and u2
+        """
+        unscaled = OrthonormalBasis.inner_product(u1, u2, x, integrator=integrator)
+        # (B)
+
+        return unscaled * self.length
+
+    def b_offset(self):
+        return len(self.ak)
+
+    def eval_basis(self, x, i=None):
+        """
+        Evaluates basis functions at given points
+        :param x: (B, *shape, 1) Points at which to evaluate basis functions
+        :param i: Optional (d) tensor of indices of basis functions to evaluate
+        :return: (B, d, *shape, 1) Basis functions evaluated at the given points
+        """
+        if i is None:
+            i = torch.arange(self.dimension, device=x.device, dtype=torch.long)
+
+        a_i = i[i < self.b_offset()]
+        b_i = i[self.b_offset() <= i] - self.b_offset()
+
+        x_ = (x[..., 0] - self.x_min) / (self.x_max - self.x_min)
+        # each (B, *shape)
+
+        ax = torch.cos(torch.einsum('N,B...->NB...', self.ak[a_i], x_))
+        add = (slice(None),) + (None,) * len(x_.shape)
+        a = ax / self.a_n[*add]
+        # each (n_a, B, *shape)
+
+        bx = torch.sin(torch.einsum('N,B...->NB...', self.bk[b_i], x_))
+        b = bx / self.b_n[*add]
+        # each (n_b, B, *shape)
+
+        basis = torch.empty((x.shape[0], i.shape[0], *x.shape[1:-1], 1), device=x.device)
+        # (B, d, *shape, 1)
+
+        basis[:, i < self.b_offset(), ..., 0] = torch.transpose(a, 1, 0)
+        basis[:, self.b_offset() <= i, ..., 0] = torch.transpose(b, 1, 0)
+
+        return basis
+
+    def validate(self):
+        """Validates that the basis is orthonormal"""
+        x = torch.linspace(self.x_min, self.x_max, 512)[:, None].to(self.ak.device)
+        # (512, 1)
+
+        basis = self.eval_basis(x[None])[0, ...]  # (n, 512, 1)
+
+        gram = torch.zeros((len(basis), len(basis)), device=self.ak.device)
+        for i in range(len(basis)):
+            for j in range(len(basis)):
+                gram[i, j] = self.inner_product(basis[i:i+1], basis[j:j+1], x[None])[0]
+        print('Gram matrix', gram)
+        print(f'Max deviation from identity: {(gram - torch.eye(self.dimension)).abs().max()}')
+
+    def show(self):
+        """Visualizes the basis functions"""
+        x = torch.linspace(self.x_min, self.x_max, 128)[:, None].to(self.ak.device)
+        # (128, 1)
+
+        basis = self.eval_basis(x[None])[0, ..., 0]  # (n, 128)
+        for i in range(len(basis)):
+            plt.plot(x[:, 0], basis[i])
+            plt.xlabel('x')
+            plt.ylabel('y')
+            if i < self.b_offset():
+                g = int(round(self.ak[i].item() / (2 * torch.pi)))
+                plt.title(f'a (cos(x)) basis g = {g} ({i+1}/{self.dimension})')
+            else:
+                g = int(round(self.bk[i - self.b_offset()].item() / (2 * torch.pi)))
+                plt.title(f'b (sin(x)) basis g = {g} ({i+1}/{self.dimension})')
+            plt.show()
+
+
 class FullFourierBasis2d(OrthonormalBasis, torch.nn.Module):
     def __init__(self, num_modes, x_min, x_max):
         """
