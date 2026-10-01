@@ -21,11 +21,11 @@ class GRF(torch.nn.Module):
             the eigenvalues as a function of the basis object
         """
         super().__init__()
-        self.basis = basis
+        self.basis = mlx.create_module(basis)
 
         if isinstance(variances, dict):
             variance_computer = mlx.create_module(variances)
-            self.variances = variance_computer(basis)
+            self.variances = variance_computer(self.basis)
         else:
             self.variances = torch.tensor(variances)
 

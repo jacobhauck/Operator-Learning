@@ -1,0 +1,16 @@
+x_min: &x_min -1
+x_max: &x_max 1
+num_samples: 5
+
+grf:
+  name: grf.GRF
+  basis:
+    name: basis.FullFourierBasis1d
+    x_min: *x_min
+    x_max: *x_max
+    num_modes: 16
+  variances:
+    name: grf.Fourier1dRationalDecayVariances
+    alpha: 1
+    beta: 1
+    gamma: 2
