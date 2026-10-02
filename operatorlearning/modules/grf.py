@@ -29,39 +29,69 @@ class GRF(torch.nn.Module):
         else:
             self.variances = torch.tensor(variances)
 
+    def _make_fn(self, c):
+        def f(x):
+            basis_val = self.basis.eval_basis(x[None])[0]  # (b, *shape, 1)
+            # (n, b)
+
+            return torch.einsum('b...D,b->...D', basis_val, c)
+
+        return f
+
     def forward(self, n, x):
         """
         Generates samples from the random field
         :param n: Number of samples to generate
-        :param x: (*shape, d) Points at which to evaluate the field
-        :return: (n, *shape, 1) Basis evaluated at x
+        :param x: (*shape, d) Points at which to evaluate the field, or None,
+            in which case a list of n callables that evaluate the functions
+            at any points is returned
+        :return: (n, *shape, 1) Basis evaluated at x, or list of n callables,
+            each mapping (*shape, d) -> (*shape, 1)
         """
-        basis_val = self.basis.eval_basis(x[None])[0]  # (b, *shape, 1)
-        coef = torch.sqrt(self.variances) * torch.randn((n, self.basis.dimension), device=basis_val.device)
-        # (n, b)
+        if x is None:
+            coef = torch.sqrt(self.variances) * torch.randn((n, self.basis.dimension), device=self.variances.device)
+            # (n, b)
 
-        return torch.einsum('b...D,Nb->N...D', basis_val, coef)
+            return [self._make_fn(coef[i]) for i in range(n)]
+        else:
+            basis_val = self.basis.eval_basis(x[None])[0]  # (b, *shape, 1)
+            coef = torch.sqrt(self.variances) * torch.randn((n, self.basis.dimension), device=self.variances.device)
+            # (n, b)
+
+            return torch.einsum('b...D,Nb->N...D', basis_val, coef)
 
 
 class Fourier1dRationalDecayVariances:
-    def __init__(self, alpha, beta, gamma):
+    def __init__(self, alpha, beta, gamma, allow_offset=True):
         self.alpha = alpha
         self.beta = beta
         self.gamma = gamma
+        self.allow_offset = allow_offset
 
     def __call__(self, basis):
         k = basis.k()
         g = k / (2 * torch.pi)
-        return self.alpha**2 / (self.beta + g**2) ** self.gamma
+        base = self.alpha**2 / (self.beta + g**2) ** self.gamma
+        if self.allow_offset:
+            return base
+        else:
+            z = torch.zeros_like(g)
+            return base * (~torch.isclose(g, z))
 
 
 class Fourier2dRationalDecayVariances:
-    def __init__(self, alpha, beta, gamma):
+    def __init__(self, alpha, beta, gamma, allow_offset=True):
         self.alpha = alpha
         self.beta = beta
         self.gamma = gamma
+        self.allow_offset = allow_offset
 
     def __call__(self, basis):
         kx, ky = basis.kx(), basis.ky()
         gx, gy = kx / (2 * torch.pi), ky / (2 * torch.pi)
-        return self.alpha**2 / (self.beta + gx**2 + gy**2) ** self.gamma
+        base = self.alpha**2 / (self.beta + gx**2 + gy**2) ** self.gamma
+        if self.allow_offset:
+            return base
+        else:
+            z = torch.zeros_like(gx)
+            return base * (~(torch.isclose(gx, z) & torch.isclose(gy, z)))
