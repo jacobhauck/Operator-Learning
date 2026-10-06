@@ -237,6 +237,10 @@ class OLDataset(torch.utils.data.Dataset):
 
         return u, x, v, y
 
+    def __iter__(self):
+        for i in range(len(self)):
+            yield self[i]
+
     def save_subsampled(self, x_indices, y_indices, output_file):
         """
         Subsamples this dataset and saves the result as a new dataset.
