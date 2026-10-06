@@ -13,15 +13,15 @@ class HyperDeepONet(torch.nn.Module):
         hyper_network_config['num_params'] = self.main_network.num_params
         self.hyper_network = mlx.create_module(hyper_network_config)
 
-    def forward(self, u, x_out):
+    def forward(self, u, y):
         """
         :param u: (B, *in_shape, u_d_out) input function samples
-        :param x_out: (B, *out_shape, v_d_in) coordinates of points at which to sample
+        :param y: (B, *out_shape, v_d_in) coordinates of points at which to sample
             the output function
         :return: (B, *out_shape, v_d_out) output function samples
         """
         params = self.hyper_network(u)
-        return self.main_network(x_out, params)
+        return self.main_network(y, params)
 
 
 def prod(nums):

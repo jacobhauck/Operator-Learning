@@ -15,16 +15,16 @@ class TwoStepDeepONet(torch.nn.Module):
         mat_size = (num_branches, num_branches)
         self.register_buffer('t_matrix', torch.randn(mat_size))
 
-    def forward(self, u, x_out):
+    def forward(self, u, y):
         """
         :param u: (B, *in_shape, u_d_out) sample values of a batch of input
             functions
-        :param x_out: (B, *out_shape, v_d_in) coordinates of points at which
+        :param y: (B, *out_shape, v_d_in) coordinates of points at which
             to sample the output function.
         :return: (B, *out_shape, v_d_out)
         """
         branch = self.deeponet.branch_net(u) # (B, p)
-        trunk = self.deeponet.trunk_net(x_out)  # (B, *out_shape, p, v_d_out)
+        trunk = self.deeponet.trunk_net(y)  # (B, *out_shape, p, v_d_out)
 
         branch_proj = torch.einsum('qp,bp->bq', self.t_matrix, branch)
         # (B, p)

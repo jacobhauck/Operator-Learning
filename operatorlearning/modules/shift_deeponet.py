@@ -28,23 +28,23 @@ class ShiftDeepONet(torch.nn.Module):
             shift_net_config
         )
 
-    def forward(self, u, x_out):
+    def forward(self, u, y):
         """
         :param u: (B, *in_shape, u_d_out) sample values of a batch of input
             functions
-        :param x_out: (B, *out_shape, v_d_in) coordinates of points at which
+        :param y: (B, *out_shape, v_d_in) coordinates of points at which
             to sample the output function.
         :return: (B, *out_shape, v_d_out)
         """
         branch_vals = self.deeponet.branch_net(u)
-        trunk_vals = self.trunk_net(u, x_out)
+        trunk_vals = self.trunk_net(u, y)
 
         pre_scaled = torch.einsum('bp,b...po->b...o', branch_vals, trunk_vals)
         # (B, *out_shape, v_d_out)
 
         scaled = self.deeponet.scale_output(pre_scaled, branch_vals.shape[1])
 
-        return self.deeponet.add_bias(scaled, x_out)
+        return self.deeponet.add_bias(scaled, y)
 
 
 class ShiftTrunkNet(torch.nn.Module):
