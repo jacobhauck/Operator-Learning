@@ -38,7 +38,7 @@ class GRF(torch.nn.Module):
 
         return f
 
-    def forward(self, n, x):
+    def forward(self, n, x=None):
         """
         Generates samples from the random field
         :param n: Number of samples to generate
