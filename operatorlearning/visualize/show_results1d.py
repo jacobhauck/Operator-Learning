@@ -26,7 +26,7 @@ def show_results1d(config, name, run_name, data, data_library, dataset_id, predi
         )
 
         u, x, v, y = data[i]
-        v_pred = predictor(u, x, y)
+        v_pred = predictor(u, x, v, y)
 
         axes[0].set_title(config.get('input_title', 'Input function $u$'))
         for j in range(u.shape[1]):
