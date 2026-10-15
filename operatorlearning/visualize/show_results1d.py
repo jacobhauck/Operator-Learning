@@ -1,6 +1,10 @@
-import mlx
-import matplotlib.pyplot as plt
+import os
 from abc import ABC, abstractmethod
+
+import matplotlib.pyplot as plt
+import mlx
+
+from .visualize1d import add_gaps
 
 
 class VisualizationInterface(ABC):
