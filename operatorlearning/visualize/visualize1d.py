@@ -40,7 +40,7 @@ def visualize_dataset(config, name, lib, dataset_id):
             if 'min_gap' in config:
                 u_, x_ = add_gaps(u[:, j], x[:, 0], config['min_gap'])
             else:
-                u_, x_ = x[:, 0], u[:, j]
+                u_, x_ = u[:, j], x[:, 0]
             
             axes[0].plot(x_, u_, **style, label=f'$u_{{{j + 1}}}$')
 
@@ -60,7 +60,7 @@ def visualize_dataset(config, name, lib, dataset_id):
             if 'min_gap' in config:
                 v_, y_ = add_gaps(v[:, j], y[:, 0], config['min_gap'])
             else:
-                v_, y_ = y[:, 0], v[:, j]
+                v_, y_ = v[:, j], y[:, 0]
             
             axes[1].plot(y_, v_, **style, label=f'$v_{{{j + 1}}}$')
 

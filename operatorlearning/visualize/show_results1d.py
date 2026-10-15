@@ -38,7 +38,7 @@ def show_results1d(config, name, run_name, data, data_library, dataset_id, predi
             if 'min_gap' in config:
                 u_, x_ = add_gaps(u[:, j], x[:, 0], config['min_gap'])
             else:
-                u_, x_ = x[:, 0], u[:, j]
+                u_, x_ = u[:, j], x[:, 0]
 
             axes[0].plot(x_, u_, **style, label=f'$u_{{{j + 1}}}$')
 
@@ -58,7 +58,7 @@ def show_results1d(config, name, run_name, data, data_library, dataset_id, predi
             if 'min_gap' in config:
                 v_, y_ = add_gaps(v[:, j], y[:, 0], config['min_gap'])
             else:
-                v_, y_ = y[:, 0], v[:, j]
+                v_, y_ = v[:, j], y[:, 0]
 
             axes[1].plot(y_, v_, **style, label=f'$v_{{{j + 1}}}$')
 
@@ -78,7 +78,7 @@ def show_results1d(config, name, run_name, data, data_library, dataset_id, predi
             if 'min_gap' in config:
                 v_pred_, y_ = add_gaps(v_pred[:, j], y[:, 0], config['min_gap'])
             else:
-                v_pred_, y_ = y[:, 0], v_pred[:, j]
+                v_pred_, y_ = v_pred[:, j], y[:, 0]
 
             axes[2].plot(y_, v_pred_, **style, label=f'$\\hat{{v}}_{{{j + 1}}}$')
 
