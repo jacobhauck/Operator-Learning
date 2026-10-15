@@ -17,7 +17,7 @@ class VisualizationInterface(ABC):
         raise NotImplemented
 
 
-def show_results1d(config, name, data, data_library, dataset_id, predictor):
+def show_results1d(config, name, run_id, data, data_library, dataset_id, predictor):
     for i in mlx.subset_indices(config, data):
         fig, axes = plt.subplots(
             1, 3,
@@ -93,7 +93,8 @@ def show_results1d(config, name, data, data_library, dataset_id, predictor):
         else:
             file_name = f'{config["split"]}-{i}'
 
-        sub_path = os.path.join(data_library, str(dataset_id))
+        run_folder = config['model']['name'] + '-' + run_id
+        sub_path = os.path.join(data_library, str(dataset_id), run_folder)
         mlx.show_and_save(fig, file_name, config, name, sub_path)
         plt.close(fig)
 
