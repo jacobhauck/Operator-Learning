@@ -19,6 +19,10 @@ class VisualizationInterface(ABC):
 
 
 def show_results1d(config, name, run_name, data, group, dataset_id, predictor):
+    error_fn = None
+    if 'error_fn' in config:
+        error_fn = mlx.create_module(config['error_fn'])
+
     for i in mlx.subset_indices(config, data):
         ncols = 4 if config.get('plot_error', False) else 3
         fig, axes = plt.subplots(
@@ -109,7 +113,11 @@ def show_results1d(config, name, run_name, data, group, dataset_id, predictor):
         axes[2].set_ylabel(config.get('pred_output_y_label', '$y$'))
 
         if config.get('plot_error', False):
-            axes[3].set_title(config.get('error_title', r'Error $|\hat{v} - v|$'))
+            if error_fn is not None:
+                err = error_fn(v_pred, v, y)
+                axes[3].set_title(config.get('error_title', r'Error $|\hat{v} - v|$; ' + f'{err:.02f}'))
+            else:
+                axes[3].set_title(config.get('error_title', r'Error $|\hat{v} - v|$'))
             error = torch.abs(v_pred - v)
             for j in range(v_pred.shape[1]):
                 if 'output_style' in config:

@@ -8,7 +8,7 @@ class FunctionalL2Loss(torch.nn.Module):
     (default just computes mean over spatial dimensions)
     """
 
-    def __init__(self, relative=True, squared=False, integrator=None):
+    def __init__(self, relative=True, squared=False, integrator=None, components=None):
         """
         :param relative: Whether to use relative loss (norm of error/norm of target)
         :param squared: Whether to return the squared L^2 norm squared (i.e., MSE)
@@ -16,6 +16,8 @@ class FunctionalL2Loss(torch.nn.Module):
             array (B, *shape, d_out) -> integral of function (B, d_out). If not
             given, then the integral is approximated by the mean over shape (i.e.,
             spatial points).
+        :param components: List of indices of components of the to apply the loss to.
+            None means all components
         """
         super().__init__()
         self.relative = relative
@@ -24,6 +26,7 @@ class FunctionalL2Loss(torch.nn.Module):
             self.integrator = mlx.create_module(integrator)
         else:
             self.integrator = None
+        self.components = components
 
     def __repr__(self):
         return f'L2Loss(relative={self.relative}, squared={self.squared})'
@@ -35,6 +38,12 @@ class FunctionalL2Loss(torch.nn.Module):
         :param x: (B, *shape, d_in) shared coordinates (or None, if using
             mean integration)
         """
+        
+        # Get only desired components, if requested
+        if self.components is not None:
+            prediction = prediction[..., self.components]  # (B, *shape, num_components)
+            target = target[..., self.num_components]  # (B, *shape, num_components)
+            
         diff2 = torch.sum((prediction - target) ** 2, dim=-1)  # (B, *shape)
 
         if self.relative:
@@ -69,13 +78,15 @@ class FunctionalL1Loss(torch.nn.Module):
     (default just computes mean over spatial dimensions)
     """
 
-    def __init__(self, relative=True, integrator=None):
+    def __init__(self, relative=True, integrator=None, components=None):
         """
         :param relative: Whether to use relative loss (norm of error/norm of target)
         :param integrator: Optional integrator module that maps function sample
             array (B, *shape, d_out) -> integral of function (B, d_out). If not
             given, then the integral is approximated by the mean over shape (i.e.,
             spatial points).
+        :param components: List of indices of components of the to apply the loss to.
+            None means all components
         """
         super().__init__()
         self.relative = relative
@@ -83,6 +94,7 @@ class FunctionalL1Loss(torch.nn.Module):
             self.integrator = mlx.create_module(integrator)
         else:
             self.integrator = None
+        self.components = components
 
     def __repr__(self):
         return f'L1Loss(relative={self.relative})'
@@ -94,6 +106,12 @@ class FunctionalL1Loss(torch.nn.Module):
         :param x: (B, *shape, d_in) shared coordinates (or None, if using
             mean integration)
         """
+        
+        # Get only desired components, if requested
+        if self.components is not None:
+            prediction = prediction[..., self.components]  # (B, *shape, num_components)
+            target = target[..., self.num_components]  # (B, *shape, num_components)
+            
         diff = torch.sum((prediction - target).abs(), dim=-1)  # (B, *shape)
 
         if self.relative:
@@ -120,7 +138,7 @@ class FunctionalH1Loss(torch.nn.Module):
     H^1 loss, either relative or not, squared or not. Allows for custom
     integrator (default just computes mean over spatial dimensions).
     """
-    def __init__(self, differentiator, relative=True, squared=False, integrator=None):
+    def __init__(self, differentiator, relative=True, squared=False, integrator=None, components=None):
         """
         :param differentiator: Module that maps function samples (B, *shape, d_out)
             and sample points (B, *shape, d_in) to the Jacobian at the sample
@@ -131,6 +149,8 @@ class FunctionalH1Loss(torch.nn.Module):
             array (B, *shape, d_out) -> integral of function (B, d_out). If not
             given, then the integral is approximated by the mean over shape (i.e.,
             spatial points).
+        :param components: List of indices of components of the to apply the loss to.
+            None means all components
         """
         super().__init__()
         self.differentiator = mlx.create_module(differentiator)
@@ -140,6 +160,7 @@ class FunctionalH1Loss(torch.nn.Module):
             self.integrator = mlx.create_module(integrator)
         else:
             self.integrator = None
+        self.components = components
 
     def __repr__(self):
         return f'H1Loss(relative={self.relative}, squared={self.squared})'
@@ -150,6 +171,12 @@ class FunctionalH1Loss(torch.nn.Module):
         :param target: (B, *shape, d_out) target function samples
         :param x: (B, *shape, d_in) sampling points for prediction and target
         """
+        
+        # Get only desired components, if requested
+        if self.components is not None:
+            prediction = prediction[..., self.components]  # (B, *shape, num_components)
+            target = target[..., self.num_components]  # (B, *shape, num_components)
+        
         j_diff = self.differentiator(prediction - target, x)
         # (B, *shape, d_out, d_in)
         j_diff2 = torch.sum(j_diff**2, dim=[-1, -2])  # (B, *shape)
@@ -188,7 +215,7 @@ class FunctionalTVLoss(torch.nn.Module):
     Total variation loss, either relative or not. Allows for custom
     integrator (default just computes mean over spatial dimensions).
     """
-    def __init__(self, differentiator, relative=True, integrator=None):
+    def __init__(self, differentiator, relative=True, integrator=None, components=None):
         """
         :param differentiator: Module that maps function samples (B, *shape, d_out)
             and sample points (B, *shape, d_in) to the Jacobian at the sample
@@ -198,6 +225,8 @@ class FunctionalTVLoss(torch.nn.Module):
             array (B, *shape, d_out) -> integral of function (B, d_out). If not
             given, then the integral is approximated by the mean over shape (i.e.,
             spatial points).
+        :param components: List of indices of components of the to apply the loss to.
+            None means all components
         """
         super().__init__()
         self.differentiator = mlx.create_module(differentiator)
@@ -206,6 +235,7 @@ class FunctionalTVLoss(torch.nn.Module):
             self.integrator = mlx.create_module(integrator)
         else:
             self.integrator = None
+        self.components = components
 
     def __repr__(self):
         return f'TVLoss(relative={self.relative})'
@@ -216,6 +246,12 @@ class FunctionalTVLoss(torch.nn.Module):
         :param target: (B, *shape, d_out) target function samples
         :param x: (B, *shape, d_in) sampling points for prediction and target
         """
+        
+        # Get only desired components, if requested
+        if self.components is not None:
+            prediction = prediction[..., self.components]  # (B, *shape, num_components)
+            target = target[..., self.num_components]  # (B, *shape, num_components)
+        
         j_diff = self.differentiator(prediction - target, x)
         # (B, *shape, d_out, d_in)
 
