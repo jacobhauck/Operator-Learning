@@ -42,7 +42,7 @@ class FunctionalL2Loss(torch.nn.Module):
         # Get only desired components, if requested
         if self.components is not None:
             prediction = prediction[..., self.components]  # (B, *shape, num_components)
-            target = target[..., self.num_components]  # (B, *shape, num_components)
+            target = target[..., self.components]  # (B, *shape, num_components)
             
         diff2 = torch.sum((prediction - target) ** 2, dim=-1)  # (B, *shape)
 
@@ -110,7 +110,7 @@ class FunctionalL1Loss(torch.nn.Module):
         # Get only desired components, if requested
         if self.components is not None:
             prediction = prediction[..., self.components]  # (B, *shape, num_components)
-            target = target[..., self.num_components]  # (B, *shape, num_components)
+            target = target[..., self.components]  # (B, *shape, num_components)
             
         diff = torch.sum((prediction - target).abs(), dim=-1)  # (B, *shape)
 
@@ -175,7 +175,7 @@ class FunctionalH1Loss(torch.nn.Module):
         # Get only desired components, if requested
         if self.components is not None:
             prediction = prediction[..., self.components]  # (B, *shape, num_components)
-            target = target[..., self.num_components]  # (B, *shape, num_components)
+            target = target[..., self.components]  # (B, *shape, num_components)
         
         j_diff = self.differentiator(prediction - target, x)
         # (B, *shape, d_out, d_in)
@@ -250,7 +250,7 @@ class FunctionalTVLoss(torch.nn.Module):
         # Get only desired components, if requested
         if self.components is not None:
             prediction = prediction[..., self.components]  # (B, *shape, num_components)
-            target = target[..., self.num_components]  # (B, *shape, num_components)
+            target = target[..., self.components]  # (B, *shape, num_components)
         
         j_diff = self.differentiator(prediction - target, x)
         # (B, *shape, d_out, d_in)
