@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 
 import matplotlib.pyplot as plt
 import mlx
+import torch
 
 from .visualize1d import add_gaps
 
