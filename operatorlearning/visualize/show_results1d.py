@@ -125,10 +125,10 @@ def show_results1d(config, name, run_name, data, group, dataset_id, predictor):
                 axes[3].plot(y_, error_, **style, label=f'$\\textnormal{error}_{{{j + 1}}}$')
 
             if 'error_xlim' in config:
-                axes[0].set_xlim(config['error_xlim'])
+                axes[3].set_xlim(config['error_xlim'])
 
             if 'error_ylim' in config:
-                axes[0].set_ylim(config['error_ylim'])
+                axes[3].set_ylim(config['error_ylim'])
     
             if config.get('output_legend', True) and v_pred.shape[1] > 1:
                 axes[3].legend()
