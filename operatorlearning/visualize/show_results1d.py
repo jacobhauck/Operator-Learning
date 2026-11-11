@@ -43,6 +43,12 @@ def show_results1d(config, name, run_name, data, group, dataset_id, predictor):
 
             axes[0].plot(x_, u_, **style, label=f'$u_{{{j + 1}}}$')
 
+        if 'input_xlim' in config:
+            axes[0].set_xlim(config['input_xlim'])
+
+        if 'input_ylim' in config:
+            axes[0].set_ylim(config['input_ylim'])
+
         if config.get('input_legend', True) and u.shape[1] > 1:
             axes[0].legend()
 
@@ -63,6 +69,12 @@ def show_results1d(config, name, run_name, data, group, dataset_id, predictor):
 
             axes[1].plot(y_, v_, **style, label=f'$v_{{{j + 1}}}$')
 
+        if 'output_xlim' in config:
+            axes[1].set_xlim(config['output_xlim'])
+
+        if 'output_ylim' in config:
+            axes[1].set_ylim(config['output_ylim'])
+
         if config.get('output_legend', True) and v.shape[1] > 1:
             axes[1].legend()
 
@@ -82,6 +94,12 @@ def show_results1d(config, name, run_name, data, group, dataset_id, predictor):
                 v_pred_, y_ = v_pred[:, j], y[:, 0]
 
             axes[2].plot(y_, v_pred_, **style, label=f'$\\hat{{v}}_{{{j + 1}}}$')
+
+        if 'pred_xlim' in config:
+            axes[2].set_xlim(config['pred_xlim'])
+
+        if 'pred_ylim' in config:
+            axes[2].set_ylim(config['pred_ylim'])
 
         if config.get('output_legend', True) and v_pred.shape[1] > 1:
             axes[2].legend()
@@ -104,6 +122,12 @@ def show_results1d(config, name, run_name, data, group, dataset_id, predictor):
                     error_, y_ = error[:, j], y[:, 0]
 
                 axes[3].plot(y_, error_, **style, label=f'$\\textnormal{error}_{{{j + 1}}}$')
+
+            if 'error_xlim' in config:
+                axes[0].set_xlim(config['error_xlim'])
+
+            if 'error_ylim' in config:
+                axes[0].set_ylim(config['error_ylim'])
     
             if config.get('output_legend', True) and v_pred.shape[1] > 1:
                 axes[3].legend()
